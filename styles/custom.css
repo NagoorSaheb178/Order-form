@@ -1,0 +1,197 @@
+/* -------------------
+   GLOBAL CONTAINER
+---------------------- */
+.app-container {
+  padding: 20px;
+  max-width: 500px;
+  margin: auto;
+  color: #e2e8f0;
+  font-family: 'Inter', sans-serif;
+}
+
+/* -------------------
+      HEADER
+---------------------- */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.app-header h1 {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.sub {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.header-right {
+  text-align: right;
+  font-size: 12px;
+}
+
+.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #4ade80;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* -------------------
+      CARD
+---------------------- */
+.card {
+  background: #0f172a;
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px solid #1e293b;
+}
+
+/* -------------------
+      INPUT
+---------------------- */
+.input {
+  width: 100%;
+  padding: 12px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: white;
+  margin: 10px 0;
+}
+
+/* -------------------
+      BUTTONS
+---------------------- */
+.primary-btn {
+  width: 100%;
+  padding: 12px;
+  background: #10b981;
+  border: none;
+  border-radius: 8px;
+  color: #061519;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.outline-btn {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #10b981;
+  background: none;
+  border-radius: 8px;
+  color: #10b981;
+  font-weight: 600;
+  margin-top: 10px;
+}
+
+/* -------------------
+      CATEGORY ITEM
+---------------------- */
+.cat-item {
+  background: #1e293b;
+  border: 1px solid #334155;
+  padding: 14px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.cat-item:hover {
+  border-color: #10b981;
+}
+
+.title {
+  font-weight: 600;
+}
+
+.small {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.go {
+  color: #10b981;
+  font-size: 12px;
+}
+
+/* -------------------
+      ITEM CARD
+---------------------- */
+.item-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  padding: 14px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.price {
+  color: #10b981;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.add-btn {
+  background: #10b981;
+  color: #062a1c;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.qty-box {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.qty-box button {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #334155;
+  border: none;
+  color: white;
+  font-size: 18px;
+}
+
+.qty-box span {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* -------------------
+      TOTAL BOX
+---------------------- */
+.total-box {
+  margin-top: 10px;
+}
+
+/* Scrollable list */
+.scroll {
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+/* Smooth Fade Animation */
+.fadeIn {
+  animation: fade 0.2s ease-in-out;
+}
+
+@keyframes fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
