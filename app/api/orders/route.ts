@@ -1,32 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Order } from "@/models/Order";
-import { enqueueOrderForSheet } from "@/lib/googleSheets";
+import { appendOrderToSheet } from "@/lib/googleSheets";
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic"; // important for Vercel
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { phone, items, totalAmount } = body;
 
-    if (!phone || !items || !items.length) {
+    if (!phone || !items?.length) {
       return NextResponse.json(
-        { message: "Invalid order" },
+        { success: false, message: "Invalid order" },
         { status: 400 }
       );
     }
 
+    // 1️⃣ MongoDB Cached Connection
     await connectToDatabase();
 
+    // 2️⃣ Save Order in DB (wait)
     const order = await Order.create({ phone, items, totalAmount });
 
-    // Very fast (adds to queue only)
-    enqueueOrderForSheet({
-      phone,
-      items,
-      totalAmount,
-    });
+    // 3️⃣ Fire & Forget — FAST
+    appendOrderToSheet({ phone, items, totalAmount });
 
     return NextResponse.json(
       {
@@ -39,7 +37,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("Order API error:", err);
     return NextResponse.json(
-      { message: "Server error" },
+      { success: false, message: "Server error" },
       { status: 500 }
     );
   }
