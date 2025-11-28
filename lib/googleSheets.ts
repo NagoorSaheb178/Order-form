@@ -6,14 +6,62 @@ interface OrderForSheet {
   totalAmount: number;
 }
 
-export async function appendOrderToSheet(order: OrderForSheet) {
+interface QueueItem {
+  order: OrderForSheet;
+  retries: number;
+}
+
+const queue: QueueItem[] = [];
+let isProcessing = false;
+
+export function enqueueOrderForSheet(order: OrderForSheet) {
+  queue.push({ order, retries: 0 });
+  console.log("📥 Added to queue. Current queue:", queue.length);
+
+  processQueue();
+}
+
+async function processQueue() {
+  if (isProcessing) return;
+  if (queue.length === 0) return;
+
+  isProcessing = true;
+
+  while (queue.length > 0) {
+    const job = queue.shift();
+    if (!job) break;
+
+    try {
+      await writeToSheet(job.order);
+      console.log("✅ Google Sheet updated successfully");
+    } catch (err) {
+      job.retries++;
+
+      console.error(
+        `❌ Google Sheet write failed (attempt ${job.retries}):`, err
+      );
+
+      if (job.retries < 5) {
+        console.log("⏳ Retrying job…");
+        queue.push(job); // retry
+      } else {
+        console.error("🚨 Dropping job after 5 failures");
+      }
+    }
+
+    await new Promise((res) => setTimeout(res, 500)); // small delay
+  }
+
+  isProcessing = false;
+}
+
+async function writeToSheet(order: OrderForSheet) {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const key = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
   const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
 
   if (!email || !key || !spreadsheetId) {
-    console.warn("Google Sheets not configured.");
-    return;
+    throw new Error("Google Sheet env missing");
   }
 
   const auth = new google.auth.JWT(
