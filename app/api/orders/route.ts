@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Order } from "@/models/Order";
-import { appendOrderToSheet } from "@/lib/googleSheets";
+import { enqueueOrderForSheet } from "@/lib/googleSheets";
 
 export const dynamic = "force-dynamic";
 
@@ -19,14 +19,10 @@ export async function POST(req: NextRequest) {
 
     await connectToDatabase();
 
-    const order = await Order.create({
-      phone,
-      items,
-      totalAmount,
-    });
+    const order = await Order.create({ phone, items, totalAmount });
 
-    // 🚀 IMPORTANT: This fixes the WRONG-ORDER problem
-    await appendOrderToSheet({
+    // Very fast (adds to queue only)
+    enqueueOrderForSheet({
       phone,
       items,
       totalAmount,
