@@ -1,30 +1,21 @@
-export async function appendOrderToSheet(order: {
-  phone: string;
-  items: { name: string; price: number; quantity: number }[];
-  totalAmount: number;
-}) {
+export async function appendOrderToSheet(order: any) {
   try {
     const url = process.env.NEXT_PUBLIC_GOOGLE_SHEETS_WEBHOOK_URL;
 
     if (!url) {
-      console.error("❌ Google Sheets Webhook Missing!");
+      console.error("Google Sheets Webhook Missing!");
       return;
     }
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-      },
-      body: JSON.stringify(order),
+    // Convert to URL encoded
+    const qs = new URLSearchParams({ data: JSON.stringify(order) });
+
+    const res = await fetch(`${url}?${qs.toString()}`, {
+      method: "GET",
       cache: "no-store",
     });
 
-    const text = await res.text();
-    console.log("📄 Sheets Response:", text);
-    return text;
+    console.log("Sheets Response:", await res.text());
   } catch (err) {
     console.error("🔥 Google Sheets Webhook Error:", err);
   }
