@@ -1,139 +1,114 @@
-export type CategoryId = "I" | "II" | "III" | "IV";
+// lib/menu.ts
 
-export interface MenuItem {
+import type { CategoryId } from "./categories";
+
+export type MenuItem = {
   id: string;
+  categoryId: CategoryId;
   name: string;
   description: string;
   price: number;
-  categoryId: CategoryId;
-}
+  imageUrl: string;
+};
 
 export const MENU_ITEMS: MenuItem[] = [
-  // I) SNACKS & STARTERS
+  // 1) SNACKS & STARTERS
   {
-    id: "pomfret-masala-fry",
-    name: "Pomfret Masala Fry (1 pc)",
-    description:
-      "White fresh marinated pomfret fried and tossed with onion and green chilli; served with salad.",
-    price: 375,
-    categoryId: "I",
+    id: "crispy-chicken",
+    categoryId: "snacks",
+    name: "Crispy Chicken Fry",
+    description: "Golden fried chicken tossed in house masala.",
+    price: 150,
+    imageUrl:
+      "https://www.licious.in/blog/wp-content/uploads/2019/05/Drumsticks-liquidation-plan-05.jpg",
   },
   {
-    id: "kolkata-fish-fry-bhetki",
-    name: "Kolkata Fish Fry Bhetki (1 pc)",
-    description:
-      "Bhetki fillet marinated with secret spices, coated with egg & breadcrumbs, deep fried; served with salad, mustard sauce, tartar sauce.",
-    price: 199,
-    categoryId: "I",
-  },
-  {
-    id: "fish-finger-bhetki",
-    name: "Fish Finger Bhetki (4 pc)",
-    description:
-      "Finger-shaped bhetki fillets coated with breadcrumbs & egg; fried and served with salad, mustard sauce, tartar sauce.",
-    price: 320,
-    categoryId: "I",
-  },
-  {
-    id: "dry-chilli-fish-bhetki",
-    name: "Dry Chilli Fish Bhetki (6 pc)",
-    description: "Indo-Chinese style spicy chilli fish.",
-    price: 390,
-    categoryId: "I",
-  },
-
-  // II) SIDE DISHES (NON-VEG)
-  {
-    id: "macher-matha-diye-dal",
-    name: "Macher Matha Diye Dal",
-    description:
-      "Roasted moong dal cooked with fried katla fish head & spices.",
+    id: "paneer-tikka",
+    categoryId: "snacks",
+    name: "Paneer Tikka",
+    description: "Smoky grilled paneer cubes marinated overnight.",
     price: 160,
-    categoryId: "II",
-  },
-  {
-    id: "muri-ghonto",
-    name: "Muri Ghonto",
-    description: "Bengali curry of potato, fish head & gobindo bhog rice.",
-    price: 175,
-    categoryId: "II",
-  },
-  {
-    id: "kochupata-chingri-bhapa",
-    name: "Kochupata Chingri Bhapa",
-    description:
-      "Steamed prawns with colocasia leaves in a special chef’s recipe.",
-    price: 275,
-    categoryId: "II",
-  },
-  {
-    id: "mocha-chingri",
-    name: "Mocha Chingri",
-    description:
-      "Banana flowers cooked with potatoes, shrimps & spices.",
-    price: 275,
-    categoryId: "II",
+    imageUrl:
+      "https://lentillovingfamily.com/wp-content/uploads/2025/08/paneer-tikka-2.jpg",
   },
 
-  // III) MAIN COURSE – CHICKEN
+  // 2) SIDE DISHES
   {
-    id: "chicken-kosha-bhuna",
-    name: "Chicken Kosha Bhuna (4 pc)",
-    description:
-      "Chicken cooked in onion, ginger-garlic paste & masala gravy.",
-    price: 340,
-    categoryId: "III",
-  },
-  {
-    id: "lebu-lonka-murgi",
-    name: "Lebu Lonka Murgi (B/L 6 pc)",
-    description:
-      "Boneless chicken in yogurt, green chilli & gondhoraj lemon.",
-    price: 280,
-    categoryId: "III",
-  },
-  {
-    id: "chicken-dakbunglow",
-    name: "Chicken Dakbunglow (4 pc)",
-    description: "Colonial-era rich chicken curry cooked with eggs.",
-    price: 360,
-    categoryId: "III",
-  },
-  {
-    id: "kala-bhuna-chicken",
-    name: "Kala Bhuna Chicken (4 pc)",
-    description: "Spicy black onion chicken gravy.",
-    price: 360,
-    categoryId: "III",
-  },
-
-  // IV) MAIN COURSE – MUTTON & DESSERT
-  {
-    id: "mutton-kosha",
-    name: "Mutton Kosha (4 pc)",
-    description: "Slow-cooked rich brown mutton curry.",
-    price: 470,
-    categoryId: "IV",
-  },
-  {
-    id: "kochhi-pathar-mangsho-jhol",
-    name: "Kochi Pathar Mangsho Jhol (4 pc)",
-    description: "Light Bengali mutton curry with potato.",
-    price: 480,
-    categoryId: "IV",
-  },
-  {
-    id: "kala-bhuna-mutton",
-    name: "Kala Bhuna Mutton (4 pc)",
-    description: "Spicy burnt black onion mutton gravy.",
-    price: 490,
-    categoryId: "IV",
-  },
-  {
-    id: "nolen-gurer-payesh",
-    name: "Nolen Gurer Payesh",
-    description: "Gobindo bhog rice pudding in jaggery.",
+    id: "veg-momos",
+    categoryId: "sides",
+    name: "Veg Momos",
+    description: "Soft dumplings filled with fresh veggies & herbs.",
     price: 120,
-    categoryId: "IV",
+    imageUrl:
+      "https://www.yummytummyaarthi.com/wp-content/uploads/2017/09/1-30.jpg",
+  },
+  {
+    id: "french-fries",
+    categoryId: "sides",
+    name: "French Fries",
+    description: "Crispy golden fries with light seasoning.",
+    price: 90,
+    imageUrl:
+      "https://www.kuchpakrahahai.in/wp-content/uploads/2023/05/Air-fryer-french-fries-recipe.jpg",
+  },
+
+  // 3) CHICKEN MAIN COURSE
+  {
+    id: "butter-chicken",
+    categoryId: "chicken",
+    name: "Butter Chicken",
+    description: "Creamy tomato gravy with tender tandoori chicken.",
+    price: 260,
+    imageUrl:
+      "https://majasrecipes.com/wp-content/uploads/2024/12/butter-chicken-recipe-5.jpg",
+  },
+  {
+    id: "chicken-biryani",
+    categoryId: "chicken",
+    name: "Chicken Biryani",
+    description: "Aromatic basmati rice layered with juicy chicken.",
+    price: 220,
+    imageUrl:
+      "https://www.cubesnjuliennes.com/wp-content/uploads/2020/07/Chicken-Biryani-Recipe.jpg",
+  },
+
+  // 4) MUTTON MAIN COURSE
+  {
+    id: "mutton-korma",
+    categoryId: "mutton",
+    name: "Mutton Korma",
+    description: "Slow-cooked mutton in a rich, spiced gravy.",
+    price: 300,
+    imageUrl:
+      "https://static.toiimg.com/photo/52554168.cms",
+  },
+  {
+    id: "mutton-biryani",
+    categoryId: "mutton",
+    name: "Mutton Biryani",
+    description: "Royal biryani made with premium mutton cuts.",
+    price: 330,
+    imageUrl:
+      "https://www.cubesnjuliennes.com/wp-content/uploads/2021/03/Best-Mutton-Biryani-Recipe.jpg",
+  },
+
+  // 5) DESSERTS
+  {
+    id: "gulab-jamun",
+    categoryId: "desserts",
+    name: "Gulab Jamun",
+    description: "Soft khoya dumplings soaked in warm sugar syrup.",
+    price: 80,
+    imageUrl:
+      "https://images.slurrp.com/prod/recipe_images/transcribe/dessert/Gulab-jamun.webp",
+  },
+  {
+    id: "brownie-icecream",
+    categoryId: "desserts",
+    name: "Brownie with Ice Cream",
+    description: "Warm chocolate brownie topped with vanilla scoop.",
+    price: 150,
+    imageUrl:
+      "https://www.cookwithkushi.com/wp-content/uploads/2017/01/sizzling_brownie_sundae_ice_cream.jpg",
   },
 ];
