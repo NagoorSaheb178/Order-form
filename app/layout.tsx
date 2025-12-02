@@ -1,5 +1,5 @@
 import "./globals.css";
-import "../styles/custom.css";   // ✅ ADD THIS LINE
+import "../styles/custom.css";
 import type { Metadata } from "next";
 import { OrderProvider } from "@/components/OrderContext";
 
@@ -15,13 +15,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <body style={{ background: "#f3f4f6" }}>
         <OrderProvider>
-          <div className="min-h-screen flex items-center justify-center px-3">
-            <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-xl p-4">
-              {children}
-            </div>
-          </div>
+          {children}
         </OrderProvider>
       </body>
     </html>
