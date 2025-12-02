@@ -2,11 +2,17 @@
 
 import { useState } from "react";
 import { useOrder } from "@/components/OrderContext";
-import { CATEGORY_LABELS } from "@/lib/categories";
-import { MENU_ITEMS, type MenuItem } from "@/lib/menu";
+import {
+  CATEGORY_LABELS,
+  type CategoryId,
+} from "@/lib/categories";
+import {
+  MENU_ITEMS,
+  type MenuItem,
+} from "@/lib/menu";
 
-
-type Step = "PHONE" | "CATEGORY" | "ITEMS" | "REVIEW";
+// Added SUCCESS step
+type Step = "PHONE" | "CATEGORY" | "ITEMS" | "REVIEW" | "SUCCESS";
 
 export default function HomePage() {
   const {
@@ -21,21 +27,23 @@ export default function HomePage() {
 
   const [step, setStep] = useState<Step>("PHONE");
   const [selectedCategory, setSelectedCategory] =
-    useState<keyof typeof CATEGORY_LABELS | null>(null);
-
-  const [selectedItemsCategoryName, setSelectedItemsCategoryName] =
+    useState<CategoryId | null>(null);
+  const [selectedCategoryName, setSelectedCategoryName] =
     useState("");
 
+  // ---------- HELPERS ------------------------------------------------
+
+  const categoryItems = (catId: CategoryId): MenuItem[] =>
+    MENU_ITEMS.filter((item) => item.categoryId === catId);
+
   const handlePhoneNext = () => {
-    if (!phone || phone.replace(/\D/g, "").length < 10) {
-      alert("Please enter a valid phone number");
+    const digits = phone.replace(/\D/g, "");
+    if (!digits || digits.length < 10) {
+      alert("Please enter a valid 10-digit phone number.");
       return;
     }
     setStep("CATEGORY");
   };
-
-  const categoryItems = (catId: keyof typeof CATEGORY_LABELS): MenuItem[] =>
-    MENU_ITEMS.filter((i) => i.categoryId === catId);
 
   const handleConfirmOrder = async () => {
     if (!cart.length) {
@@ -64,295 +72,347 @@ export default function HomePage() {
         throw new Error(data.message || "Order failed");
       }
 
+      // -------------- SUCCESS SCREEN + FULL RESET -----------------
       clearCart();
-      setStep("CATEGORY");
-      alert("Your order is confirmed! You will receive an SMS shortly.");
+      setPhone("");                // phone reset
+      setSelectedCategory(null);   // category reset
+      setSelectedCategoryName(""); // text reset
+
+      setStep("SUCCESS");
+
+      setTimeout(() => {
+        setStep("PHONE"); // fresh start
+      }, 2500);
+
     } catch (err) {
       console.error(err);
       alert("Something went wrong while placing the order.");
     }
   };
 
+  // ---------- UI -----------------------------------------------------
+
   return (
-    <div className="space-y-4">
-
-      {/* =======================
-          HEADER
-      ======================= */}
-      <header className="flex items-center justify-between mb-4 pb-3 border-b border-slate-700/40">
-        <div className="text-left">
-          <h1 className="text-xl font-semibold tracking-tight text-white">
-            Fish & Feast
-          </h1>
-          <p className="text-xs text-slate-400">Scan · Select · Enjoy</p>
-        </div>
-
-        {phone && (
-          <div className="text-right text-xs text-slate-300">
-            <p className="font-medium">Hi, {phone}</p>
-            <button
-              onClick={() => setStep("REVIEW")}
-              className="underline underline-offset-2 hover:text-emerald-400 transition"
-            >
-              View Order ({cart.length})
-            </button>
-          </div>
-        )}
-      </header>
-
-      {/* =======================
-          STEP: PHONE
-      ======================= */}
-      {step === "PHONE" && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-white">Enter your phone</h2>
-          <p className="text-xs text-slate-400">
-            We&apos;ll send your order confirmation to this number.
-          </p>
-
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="e.g. +91 9XXXXXXXXX"
-            className="w-full rounded-xl bg-slate-900/40 backdrop-blur-md border border-slate-700/40 px-4 py-2.5 text-sm text-white focus:ring-2 focus:ring-emerald-500/70 outline-none transition"
-          />
-
-          <button
-            onClick={handlePhoneNext}
-            className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-2.5 text-sm font-semibold shadow-md hover:opacity-90 transition"
-          >
-            Continue
-          </button>
-        </div>
-      )}
-
-      {/* =======================
-          STEP: CATEGORY
-      ======================= */}
-      {step === "CATEGORY" && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center mb-1">
-            <h2 className="text-lg font-semibold text-white">
-              Choose a category
-            </h2>
-
-            <button
-              className="text-xs text-slate-400 underline hover:text-emerald-400 transition"
-              onClick={() => setStep("PHONE")}
-            >
-              Change phone
-            </button>
+    <div className="order-page-root">
+      <div className="order-card">
+        {/* HEADER */}
+        <header className="order-card-header">
+          <div>
+            <h1 className="order-brand">Baker's cafe</h1>
+            <p className="order-subtitle">Scan · Select · Enjoy</p>
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
-            {(Object.keys(
-              CATEGORY_LABELS
-            ) as (keyof typeof CATEGORY_LABELS)[]).map((catId) => (
-              <button
-                key={catId}
-                onClick={() => {
-                  setSelectedCategory(catId);
-                  setSelectedItemsCategoryName(CATEGORY_LABELS[catId]);
-                  setStep("ITEMS");
-                }}
-                className="flex items-center justify-between rounded-xl bg-slate-800/40 backdrop-blur-md border border-slate-700/40 px-4 py-3 shadow-[0_4px_18px_-4px_rgba(0,0,0,0.4)] hover:border-emerald-400/70 hover:bg-slate-800/60 transition duration-200"
-              >
-                <div className="text-left">
-                  <p className="text-sm font-medium text-white">
-                    {CATEGORY_LABELS[catId]}
-                  </p>
-                  <p className="text-[11px] text-slate-400">
-                    {categoryItems(catId).length} items
-                  </p>
-                </div>
-
-                <span className="text-xs text-emerald-400 font-medium">
-                  Select ›
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {cart.length > 0 && (
-            <button
-              onClick={() => setStep("REVIEW")}
-              className="w-full rounded-xl border border-emerald-500/70 py-2 text-sm font-medium hover:bg-emerald-500/10 transition"
-            >
-              View current order ({cart.length} · ₹{totalAmount})
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* =======================
-          STEP: ITEMS
-      ======================= */}
-      {step === "ITEMS" && selectedCategory && (
-        <div className="space-y-4">
-
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setStep("CATEGORY")}
-              className="text-xs text-slate-400 underline hover:text-emerald-400 transition"
-            >
-              ‹ Back to categories
-            </button>
-
-            <button
-              onClick={() => setStep("REVIEW")}
-              className="text-xs text-emerald-400 underline hover:text-emerald-300 transition"
-            >
-              View order ({cart.length})
-            </button>
-          </div>
-
-          <h2 className="text-lg font-semibold text-white">
-            {selectedItemsCategoryName}
-          </h2>
-
-          <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-            {categoryItems(selectedCategory).map((item) => {
-              const cartItem = cart.find((c) => c.item.id === item.id);
-              const qty = cartItem?.quantity ?? 0;
-
-              return (
-                <div
-                  key={item.id}
-                  className="rounded-xl bg-slate-800/40 backdrop-blur-md border border-slate-700/40 p-3 flex justify-between items-center shadow-[0_4px_18px_-4px_rgba(0,0,0,0.4)]"
+          {phone && (
+            <div className="order-header-right">
+              <span className="order-header-phone">
+                Hi, {phone}
+              </span>
+              {cart.length > 0 && (
+                <button
+                  type="button"
+                  className="order-link"
+                  onClick={() => setStep("REVIEW")}
                 >
-                  <div className="pr-2">
-                    <p className="text-sm font-medium text-white">{item.name}</p>
-                    <p className="text-[11px] text-slate-400 line-clamp-2">
-                      {item.description}
-                    </p>
-                    <p className="text-sm mt-1 font-semibold text-emerald-400">
-                      ₹{item.price}
-                    </p>
-                  </div>
+                  View order ({cart.length})
+                </button>
+              )}
+            </div>
+          )}
+        </header>
 
-                  <div className="flex flex-col items-center">
-                    {qty === 0 ? (
-                      <button
-                        onClick={() => addItem(item)}
-                        className="text-xs px-3 py-1 rounded-full bg-emerald-500 font-medium text-black hover:bg-emerald-400 transition"
-                      >
-                        Add +
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => updateQuantity(item.id, qty - 1)}
-                          className="w-8 h-8 flex items-center justify-center rounded-full border border-slate-600 bg-slate-800/40 hover:border-emerald-400 hover:text-emerald-400 transition"
-                        >
-                          –
-                        </button>
+        {/* MAIN BODY */}
+        <main className="order-card-body">
 
-                        <span className="text-sm font-medium w-4 text-center text-white">
-                          {qty}
-                        </span>
+          {/* STEP 1 – PHONE */}
+          {step === "PHONE" && (
+            <section className="order-section fade-in">
+              <h2 className="order-section-title">Enter your phone</h2>
+              <p className="order-section-text">
+                We'll send your order confirmation to this number.
+              </p>
 
-                        <button
-                          onClick={() => updateQuantity(item.id, qty + 1)}
-                          className="w-8 h-8 flex items-center justify-center rounded-full border border-emerald-500 bg-slate-800/40 hover:border-emerald-400 hover:text-emerald-400 transition"
-                        >
-                          +
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="e.g. +91 9XXXXXXXXX"
+                className="order-input"
+              />
 
-          <button
-            onClick={() => setStep("REVIEW")}
-            className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-2.5 text-sm font-semibold shadow-md hover:opacity-90 transition"
-          >
-            Go to Order ({cart.length} · ₹{totalAmount})
-          </button>
-        </div>
-      )}
+              <button
+                type="button"
+                onClick={handlePhoneNext}
+                className="order-primary-btn"
+              >
+                Continue
+              </button>
+            </section>
+          )}
 
-      {/* =======================
-          STEP: REVIEW
-      ======================= */}
-      {step === "REVIEW" && (
-        <div className="space-y-4">
-
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setStep("CATEGORY")}
-              className="text-xs text-slate-400 underline hover:text-emerald-400 transition"
-            >
-              ‹ Back to menu
-            </button>
-
-            <p className="text-xs text-slate-400">Edit items &amp; confirm</p>
-          </div>
-
-          <h2 className="text-lg font-semibold text-white">Your Order</h2>
-
-          {cart.length === 0 ? (
-            <p className="text-sm text-slate-400">No items added yet.</p>
-          ) : (
-            <>
-              <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-1">
-                {cart.map((c) => (
-                  <div
-                    key={c.item.id}
-                    className="flex items-center justify-between rounded-xl bg-slate-800/40 backdrop-blur-md border border-slate-700/40 p-3 shadow-[0_4px_18px_-4px_rgba(0,0,0,0.4)]"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-white">{c.item.name}</p>
-                      <p className="text-[11px] text-slate-400">
-                        ₹{c.item.price} × {c.quantity}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => updateQuantity(c.item.id, c.quantity - 1)}
-                        className="w-7 h-7 flex items-center justify-center rounded-full border border-slate-600 bg-slate-800/40 hover:border-emerald-400 hover:text-emerald-400 transition"
-                      >
-                        –
-                      </button>
-
-                      <span className="text-sm font-medium w-4 text-center text-white">
-                        {c.quantity}
-                      </span>
-
-                      <button
-                        onClick={() => updateQuantity(c.item.id, c.quantity + 1)}
-                        className="w-7 h-7 flex items-center justify-center rounded-full border border-emerald-500 bg-slate-800/40 hover:border-emerald-400 hover:text-emerald-400 transition"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="border-t border-slate-700/40 pt-3 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-300">Total</span>
-                  <span className="font-semibold text-emerald-400">
-                    ₹{totalAmount}
-                  </span>
-                </div>
+          {/* STEP 2 – CATEGORY */}
+          {step === "CATEGORY" && (
+            <section className="order-section fade-in">
+              <div className="order-section-header">
+                <h2 className="order-section-title">Choose a category</h2>
 
                 <button
-                  onClick={handleConfirmOrder}
-                  className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-2.5 text-sm font-semibold shadow-md hover:opacity-90 transition"
+                  type="button"
+                  className="order-link"
+                  onClick={() => setStep("PHONE")}
                 >
-                  Confirm Order
+                  Change phone
                 </button>
               </div>
-            </>
+
+              <div className="order-category-list">
+                {(Object.keys(CATEGORY_LABELS) as CategoryId[]).map(
+                  (catId) => {
+                    const items = categoryItems(catId);
+                    if (!items.length) return null;
+
+                    return (
+                      <button
+                        key={catId}
+                        type="button"
+                        className="order-category-card"
+                        onClick={() => {
+                          setSelectedCategory(catId);
+                          setSelectedCategoryName(CATEGORY_LABELS[catId]);
+                          setStep("ITEMS");
+                        }}
+                      >
+                        <div>
+                          <h3 className="order-category-name">
+                            {CATEGORY_LABELS[catId]}
+                          </h3>
+                          <p className="order-category-meta">
+                            {items.length} dishes
+                          </p>
+                        </div>
+                        <span className="order-category-cta">Select ›</span>
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+
+              {cart.length > 0 && (
+                <button
+                  type="button"
+                  className="order-secondary-btn"
+                  onClick={() => setStep("REVIEW")}
+                >
+                  View current order ({cart.length} · ₹{totalAmount})
+                </button>
+              )}
+            </section>
           )}
-        </div>
-      )}
+
+          {/* STEP 3 – ITEMS */}
+          {step === "ITEMS" && selectedCategory && (
+            <section className="order-section fade-in">
+              <div className="order-section-header">
+                <button
+                  type="button"
+                  className="order-link"
+                  onClick={() => setStep("CATEGORY")}
+                >
+                  ‹ Back to categories
+                </button>
+
+                {cart.length > 0 && (
+                  <button
+                    type="button"
+                    className="order-link order-link-strong"
+                    onClick={() => setStep("REVIEW")}
+                  >
+                    View order ({cart.length})
+                  </button>
+                )}
+              </div>
+
+              <h2 className="order-section-title">{selectedCategoryName}</h2>
+
+              <div className="order-items-list">
+                {categoryItems(selectedCategory).map((item) => {
+                  const cartItem = cart.find(
+                    (c) => c.item.id === item.id
+                  );
+                  const qty = cartItem?.quantity ?? 0;
+
+                  return (
+                    <article key={item.id} className="order-item-card">
+                      <div className="order-item-image-wrap">
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="order-item-image"
+                        />
+                      </div>
+
+                      <div className="order-item-content">
+                        <div className="order-item-main">
+                          <h3 className="order-item-name">{item.name}</h3>
+                          <p className="order-item-desc">{item.description}</p>
+                        </div>
+
+                        <div className="order-item-footer">
+                          <span className="order-item-price">₹{item.price}</span>
+
+                          {qty === 0 ? (
+                            <button
+                              type="button"
+                              className="order-add-btn"
+                              onClick={() => addItem(item)}
+                            >
+                              Add +
+                            </button>
+                          ) : (
+                            <div className="order-qty-control">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateQuantity(item.id, qty - 1)
+                                }
+                              >
+                                –
+                              </button>
+                              <span>{qty}</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateQuantity(item.id, qty + 1)
+                                }
+                              >
+                                +
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              {cart.length > 0 && (
+                <button
+                  type="button"
+                  className="order-primary-btn"
+                  onClick={() => setStep("REVIEW")}
+                >
+                  Go to order ({cart.length} · ₹{totalAmount})
+                </button>
+              )}
+            </section>
+          )}
+
+          {/* STEP 4 – REVIEW */}
+          {step === "REVIEW" && (
+            <section className="order-section fade-in">
+              <div className="order-section-header">
+                <button
+                  type="button"
+                  className="order-link"
+                  onClick={() => setStep("CATEGORY")}
+                >
+                  ‹ Back to menu
+                </button>
+              </div>
+
+              <h2 className="order-section-title">Your order</h2>
+
+              {cart.length === 0 ? (
+                <p className="order-section-text">No items yet. Please add something.</p>
+              ) : (
+                <>
+                  <div className="order-review-list">
+                    {cart.map((c) => (
+                      <div key={c.item.id} className="order-review-row">
+                        <div>
+                          <p className="order-review-name">{c.item.name}</p>
+                          <p className="order-review-meta">
+                            ₹{c.item.price} × {c.quantity}
+                          </p>
+                        </div>
+
+                        <div className="order-review-controls">
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(c.item.id, c.quantity - 1)}
+                          >
+                            –
+                          </button>
+                          <span>{c.quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(c.item.id, c.quantity + 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="order-summary">
+                    <div className="order-summary-row">
+                      <span>Total</span>
+                      <strong>₹{totalAmount}</strong>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="order-primary-btn"
+                      onClick={handleConfirmOrder}
+                    >
+                      Confirm order
+                    </button>
+                  </div>
+                </>
+              )}
+            </section>
+          )}
+
+          {/* STEP 5 – SUCCESS SCREEN */}
+          {step === "SUCCESS" && (
+            <section
+              className="order-section fade-in"
+              style={{ textAlign: "center", padding: "40px 0" }}
+            >
+              <div
+                style={{
+                  width: "90px",
+                  height: "90px",
+                  borderRadius: "50%",
+                  background: "#A7E5C1",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 20px",
+                }}
+              >
+                <span style={{ fontSize: "50px", color: "white" }}>✔</span>
+              </div>
+
+              <h2
+                style={{
+                  fontSize: "22px",
+                  fontWeight: "700",
+                  marginBottom: "6px",
+                }}
+              >
+                Your order is confirmed
+              </h2>
+
+              <p style={{ fontSize: "14px", color: "#6b7280" }}>
+                Thank you for Choosing us.
+              </p>
+            </section>
+          )}
+
+        </main>
+      </div>
     </div>
   );
 }
