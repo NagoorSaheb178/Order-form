@@ -1,8 +1,11 @@
-import type { CategoryId } from "./menu";
+// lib/categories.ts
+
+export type CategoryId = "snacks" | "sides" | "chicken" | "mutton" | "desserts";
 
 export const CATEGORY_LABELS: Record<CategoryId, string> = {
-  I: "I) Snacks & Starters",
-  II: "II) Side Dishes (Non-Veg)",
-  III: "III) Chicken Main Course",
-  IV: "IV) Mutton & Dessert",
+  snacks: "Snacks & Starters",
+  sides: "Side Dishes",
+  chicken: "Chicken Main Course",
+  mutton: "Mutton Main Course",
+  desserts: "Desserts",
 };
