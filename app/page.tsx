@@ -402,7 +402,7 @@ export default function HomePage() {
                   marginBottom: "6px",
                 }}
               >
-                Your order is confirmed
+                  Your order is being prepared
               </h2>
 
               <p style={{ fontSize: "14px", color: "#6b7280" }}>
