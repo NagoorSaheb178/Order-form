@@ -1,197 +1,544 @@
-/* -------------------
-   GLOBAL CONTAINER
----------------------- */
-.app-container {
-  padding: 20px;
-  max-width: 500px;
-  margin: auto;
-  color: #e2e8f0;
-  font-family: 'Inter', sans-serif;
+/* styles/custom.css */
+
+/* --------- GLOBAL --------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-/* -------------------
-      HEADER
----------------------- */
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.app-header h1 {
-  font-size: 22px;
-  font-weight: 600;
-}
-
-.sub {
-  font-size: 11px;
-  opacity: 0.7;
-}
-
-.header-right {
-  text-align: right;
-  font-size: 12px;
-}
-
-.link {
-  background: none;
-  border: none;
+html,
+body {
+  margin: 0;
   padding: 0;
-  color: #4ade80;
-  font-size: 12px;
-  cursor: pointer;
-  text-decoration: underline;
+  min-height: 100%;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: #f3f4f6; /* light grey */
+  color: #111827;
 }
 
-/* -------------------
-      CARD
----------------------- */
-.card {
-  background: #0f172a;
-  padding: 18px;
-  border-radius: 12px;
-  border: 1px solid #1e293b;
+/* --------- PAGE ROOT --------- */
+
+.order-page-root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
 }
 
-/* -------------------
-      INPUT
----------------------- */
-.input {
+/* --------- MAIN CARD --------- */
+
+.order-card {
   width: 100%;
-  padding: 12px;
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  color: white;
-  margin: 10px 0;
+  max-width: 900px;
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.15);
+  border: 1px solid #e5e7eb;
+  padding: 28px 32px 32px;
 }
 
-/* -------------------
-      BUTTONS
----------------------- */
-.primary-btn {
-  width: 100%;
-  padding: 12px;
-  background: #10b981;
-  border: none;
-  border-radius: 8px;
-  color: #061519;
-  font-weight: 600;
-  cursor: pointer;
-}
+/* header (brand + phone) */
 
-.outline-btn {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #10b981;
-  background: none;
-  border-radius: 8px;
-  color: #10b981;
-  font-weight: 600;
-  margin-top: 10px;
-}
-
-/* -------------------
-      CATEGORY ITEM
----------------------- */
-.cat-item {
-  background: #1e293b;
-  border: 1px solid #334155;
-  padding: 14px;
-  border-radius: 12px;
-  margin-bottom: 10px;
+.order-card-header {
   display: flex;
   justify-content: space-between;
-  cursor: pointer;
-  transition: 0.2s;
+  align-items: center;
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid #e5e7eb;
 }
 
-.cat-item:hover {
-  border-color: #10b981;
+.order-brand {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
-.title {
-  font-weight: 600;
+.order-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b7280;
 }
 
-.small {
-  font-size: 11px;
-  opacity: 0.8;
+.order-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
 
-.go {
-  color: #10b981;
-  font-size: 12px;
+.order-header-phone {
+  font-size: 13px;
+  color: #374151;
 }
 
-/* -------------------
-      ITEM CARD
----------------------- */
-.item-card {
-  background: #1e293b;
-  border: 1px solid #334155;
-  padding: 14px;
-  border-radius: 12px;
-  margin-bottom: 10px;
+/* main body */
+
+.order-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* --------- GENERIC SECTION --------- */
+
+.order-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.order-section-header {
   display: flex;
   justify-content: space-between;
-}
-
-.price {
-  color: #10b981;
-  font-weight: 600;
-  margin-top: 4px;
-}
-
-.add-btn {
-  background: #10b981;
-  color: #062a1c;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.qty-box {
-  display: flex;
-  gap: 8px;
   align-items: center;
 }
 
-.qty-box button {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  background: #334155;
-  border: none;
-  color: white;
-  font-size: 18px;
+.order-section-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
 }
 
-.qty-box span {
+.order-section-text {
+  margin: 0;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* fade in animation */
+
+.fade-in {
+  animation: order-fade 0.25s ease-out;
+}
+
+@keyframes order-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --------- INPUTS + BUTTONS --------- */
+
+.order-input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 14px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  color: #111827;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.order-input:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 1px #22c55e33;
+  background: #ffffff;
+}
+
+/* primary button */
+
+.order-primary-btn {
+  width: 100%;
+  border: none;
+  margin-top: 4px;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #ffffff;
+  background: linear-gradient(90deg, #10b981, #059669);
+  box-shadow: 0 10px 25px rgba(16, 185, 129, 0.35);
+  transition: transform 0.12s ease, box-shadow 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.order-primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px rgba(16, 185, 129, 0.4);
+  opacity: 0.96;
+}
+
+.order-primary-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.32);
+}
+
+/* secondary outline button */
+
+.order-secondary-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #059669;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: #047857;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.order-secondary-btn:hover {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+/* text links */
+
+.order-link {
+  border: none;
+  background: none;
+  color: #2563eb;
+  font-size: 13px;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.order-link-strong {
+  font-weight: 500;
+}
+
+/* --------- CATEGORY LIST --------- */
+
+.order-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.order-category-card {
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease,
+    background-color 0.15s ease, transform 0.1s ease;
+}
+
+.order-category-card:hover {
+  border-color: #22c55e;
+  background: #ffffff;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.order-category-name {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.order-category-meta {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.order-category-cta {
+  font-size: 13px;
+  color: #059669;
+  font-weight: 500;
+}
+
+/* --------- ITEMS LIST --------- */
+
+.order-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.order-item-card {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.order-item-card:hover {
+  border-color: #22c55e;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.order-item-image-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+  background: #e5e7eb;
+}
+
+.order-item-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 80px;
+  object-fit: cover;
+}
+
+.order-item-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.order-item-main {
+  margin-bottom: 4px;
+}
+
+.order-item-name {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.order-item-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* footer row */
+
+.order-item-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.order-item-price {
+  font-size: 15px;
+  font-weight: 600;
+  color: #047857;
+}
+
+/* add button */
+
+.order-add-btn {
+  border: none;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #052e16;
+  background: #22c55e;
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.5);
+  transition: transform 0.1s ease, box-shadow 0.1s ease,
+    opacity 0.1s ease;
+}
+
+.order-add-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(34, 197, 94, 0.6);
+  opacity: 0.96;
+}
+
+/* quantity control */
+
+.order-qty-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #ecfdf5;
+}
+
+.order-qty-control button {
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #047857;
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+  padding: 0;
+}
+
+.order-qty-control span {
+  min-width: 18px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* --------- REVIEW SECTION --------- */
+
+.order-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-top: 4px;
+}
+
+.order-review-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.order-review-name {
+  margin: 0 0 2px;
   font-size: 14px;
   font-weight: 600;
 }
 
-/* -------------------
-      TOTAL BOX
----------------------- */
-.total-box {
-  margin-top: 10px;
+.order-review-meta {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
 }
 
-/* Scrollable list */
-.scroll {
-  max-height: 55vh;
-  overflow-y: auto;
+.order-review-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #ecfdf5;
+  border-radius: 999px;
+  padding: 3px 8px;
 }
 
-/* Smooth Fade Animation */
-.fadeIn {
-  animation: fade 0.2s ease-in-out;
+.order-review-controls button {
+  border: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #047857;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
 }
 
-@keyframes fade {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+.order-review-controls span {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* summary box */
+
+.order-summary {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.order-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 15px;
+}
+
+/* --------- RESPONSIVE --------- */
+
+@media (max-width: 768px) {
+  .order-card {
+    padding: 20px 18px 24px;
+    border-radius: 0;
+    box-shadow: none;
+    max-width: 100%;
+  }
+
+  .order-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .order-items-list {
+    max-height: 360px;
+  }
+}
+
+/* ----------------------------------------------------- */
+/* --------- FIXES ADDED (NO ORIGINAL LINES REMOVED) ----*/
+/* ----------------------------------------------------- */
+
+/* Force all text to be fully visible */
+.order-category-name,
+.order-category-meta,
+.order-category-cta,
+.order-item-name,
+.order-item-desc,
+.order-review-name,
+.order-review-meta,
+.order-section-title,
+.order-section-text {
+  color: #111827 !important;
+  opacity: 1 !important;
+}
+
+/* Improves contrast for categories that looked disabled */
+.order-category-card {
+  background-color: #ffffff !important;
+  border-color: #d1d5db !important;
+}
+
+/* Ensure no section appears faded */
+.order-category-card,
+.order-item-card,
+.order-review-row {
+  opacity: 1 !important;
+}
+
+/* Make text extra clear on mobile */
+@media (max-width: 768px) {
+  .order-card {
+    background: #ffffff !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1) !important;
+  }
 }
