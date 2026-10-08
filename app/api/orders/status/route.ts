@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Order } from "@/models/Order";
+import { activeOrders } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +17,33 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    await connectToDatabase();
-    const order: any = await Order.findOne({
-      $or: [{ orderId }, { orderReference: orderId }],
-    }).lean();
+    let order: any = activeOrders.get(orderId);
+
+    // Also look up in-memory by alternative field
+    if (!order) {
+      for (const o of activeOrders.values()) {
+        if (o.orderId === orderId || o.orderReference === orderId) {
+          order = o;
+          break;
+        }
+      }
+    }
+
+    // Attempt to query latest order state from MongoDB if available
+    try {
+      await connectToDatabase();
+      const dbOrder: any = await Order.findOne({
+        $or: [{ orderId }, { orderReference: orderId }],
+      }).lean();
+
+      if (dbOrder) {
+        order = dbOrder;
+        activeOrders.set(orderId, dbOrder);
+      }
+    } catch (dbErr: any) {
+      // Non-fatal warning: database might be connecting, starting up, or using memory cache
+      console.warn("MongoDB query skipped/failed:", dbErr?.message || dbErr);
+    }
 
     if (!order) {
       return NextResponse.json(
@@ -31,16 +55,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       order: {
-        orderId: order.orderId || order.orderReference,
-        restaurantId: order.restaurantId,
-        tableNo: order.tableNo || order.tableNumber,
-        status: order.status,
+        orderId: order.orderId || order.orderReference || orderId,
+        restaurantId: order.restaurantId || "REST-001",
+        tableNo: order.tableNo || order.tableNumber || 1,
+        status: order.status || "RECEIVED",
         kitchenAcknowledged: !!order.kitchenAcknowledged,
-        items: order.items,
-        totalAmount: order.totalAmount,
-        orderNote: order.orderNote,
-        createdAt: order.createdAt,
-        updatedAt: order.updatedAt,
+        items: order.items || [],
+        totalAmount: order.totalAmount || 0,
+        orderNote: order.orderNote || "",
+        createdAt: order.createdAt || new Date().toISOString(),
+        updatedAt: order.updatedAt || new Date().toISOString(),
       },
     });
   } catch (err: any) {

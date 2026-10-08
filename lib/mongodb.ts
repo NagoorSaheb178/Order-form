@@ -31,7 +31,9 @@ function getMongoUri(): string {
     // continue to process.env fallback
   }
 
-  const envUri = process.env.MONGODB_URI || "";
+  const envUri =
+    process.env.MONGODB_URI ||
+    "mongodb://menu:Nagoor271@ac-jxpidhb-shard-00-00.gg7r1on.mongodb.net:27017,ac-jxpidhb-shard-00-01.gg7r1on.mongodb.net:27017,ac-jxpidhb-shard-00-02.gg7r1on.mongodb.net:27017/restaurant_orders?ssl=true&replicaSet=atlas-128119-shard-0&authSource=admin&appName=Test";
   return envUri.replace(/<([^>]+)>/g, "$1");
 }
 

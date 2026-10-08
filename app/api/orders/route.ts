@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Order } from "@/models/Order";
-import { orderEventBus } from "@/lib/events";
+import { orderEventBus, activeOrders } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +56,13 @@ export async function POST(req: NextRequest) {
     } catch (dbErr: any) {
       console.warn("MongoDB save warning:", dbErr?.message || dbErr);
     }
+
+    // Store in active in-memory cache for instant status queries
+    activeOrders.set(ref, {
+      ...orderData,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
 
     // Broadcast new order to Kitchen AI in realtime
     orderEventBus.emit("new_order", {
