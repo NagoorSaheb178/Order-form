@@ -2,10 +2,10 @@
 import { EventEmitter } from "events";
 
 export interface OrderStatusEvent {
-  event: "ORDER_STATUS_UPDATED";
+  event: "ORDER_STATUS_UPDATED" | "order.status_changed";
   orderId: string;
   restaurantId: string;
-  status: "SUBMITTED" | "RECEIVED" | "PREPARING" | "READY" | "SERVED";
+  status: "SUBMITTED" | "RECEIVED" | "PREPARING" | "READY" | "SERVED" | "CANCELLED";
   kitchenAcknowledged: boolean;
   updatedAt: string;
 }
@@ -33,12 +33,16 @@ if (!global.__activeOrders) {
 export const orderEventBus: EventEmitter = global.__orderEventBus;
 export const activeOrders: Map<string, any> = global.__activeOrders;
 
-// Automatically keep in-memory cache synchronized with status updates
-orderEventBus.on("status_updated", (evt: OrderStatusEvent) => {
+const updateCachedStatus = (evt: OrderStatusEvent) => {
   const existing = activeOrders.get(evt.orderId);
   if (existing) {
     existing.status = evt.status;
     existing.kitchenAcknowledged = evt.kitchenAcknowledged;
     existing.updatedAt = evt.updatedAt;
   }
-});
+};
+
+// Automatically keep in-memory cache synchronized with status updates
+orderEventBus.on("status_updated", updateCachedStatus);
+orderEventBus.on("order.status_changed", updateCachedStatus);
+orderEventBus.on("order_status", updateCachedStatus);

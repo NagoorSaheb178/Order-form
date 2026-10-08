@@ -35,16 +35,26 @@ export async function GET(req: NextRequest) {
       statusListener = (event: OrderStatusEvent) => {
         if (event.orderId === targetOrderId) {
           send({
+            event: "order.status_changed",
+            orderId: event.orderId,
+            restaurantId: event.restaurantId,
+            status: event.status,
+            kitchenAcknowledged: !!event.kitchenAcknowledged,
+            updatedAt: event.updatedAt,
+          });
+          send({
             event: "ORDER_STATUS_UPDATED",
             orderId: event.orderId,
             status: event.status,
-            kitchenAcknowledged: event.kitchenAcknowledged,
+            kitchenAcknowledged: !!event.kitchenAcknowledged,
             updatedAt: event.updatedAt,
           });
         }
       };
 
+      orderEventBus.on("order.status_changed", statusListener);
       orderEventBus.on("order_status", statusListener);
+      orderEventBus.on("status_updated", statusListener);
 
       // Heartbeat every 15 seconds to keep connection alive
       heartbeatTimer = setInterval(() => {
@@ -60,7 +70,11 @@ export async function GET(req: NextRequest) {
         if (isClosed) return;
         isClosed = true;
         if (heartbeatTimer) clearInterval(heartbeatTimer);
-        if (statusListener) orderEventBus.off("order_status", statusListener);
+        if (statusListener) {
+          orderEventBus.off("order.status_changed", statusListener);
+          orderEventBus.off("order_status", statusListener);
+          orderEventBus.off("status_updated", statusListener);
+        }
         try {
           controller.close();
         } catch (e) {}
@@ -71,7 +85,11 @@ export async function GET(req: NextRequest) {
     cancel() {
       isClosed = true;
       if (heartbeatTimer) clearInterval(heartbeatTimer);
-      if (statusListener) orderEventBus.off("order_status", statusListener);
+      if (statusListener) {
+        orderEventBus.off("order.status_changed", statusListener);
+        orderEventBus.off("order_status", statusListener);
+        orderEventBus.off("status_updated", statusListener);
+      }
     },
   });
 

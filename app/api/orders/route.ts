@@ -64,12 +64,88 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date().toISOString(),
     });
 
-    // Broadcast new order to Kitchen AI in realtime
+    // Broadcast new order to Kitchen AI in realtime (internal bus)
     orderEventBus.emit("new_order", {
       event: "NEW_ORDER",
       order: orderData,
       restaurantId,
     });
+
+    // Send HTTP Order Webhook to Kitchen AI Backend
+    let kitchenNotified = false;
+    let kitchenInternalId = "";
+    const kitchenWebhookUrl =
+      process.env.KITCHEN_ORDER_WEBHOOK_URL ||
+      (process.env.NODE_ENV !== "production" ? "http://localhost:3001/api/webhooks/orders" : "");
+
+    if (kitchenWebhookUrl) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+        const kitchenHeaders: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (process.env.KITCHEN_STATUS_WEBHOOK_SECRET) {
+          kitchenHeaders["x-webhook-secret"] = process.env.KITCHEN_STATUS_WEBHOOK_SECRET;
+        }
+
+        const kitchenRes = await fetch(kitchenWebhookUrl, {
+          method: "POST",
+          headers: kitchenHeaders,
+          body: JSON.stringify({
+            restaurantId,
+            externalOrderId: ref,
+            tableNo: tNum,
+            items: items.map((i: any) => ({
+              name: i.name,
+              quantity: i.quantity || i.qty || 1,
+              note: i.note || "",
+            })),
+            createdAt: new Date().toISOString(),
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (kitchenRes.ok) {
+          const kData = await kitchenRes.json().catch(() => ({}));
+          if (kData.success || kitchenRes.status === 200 || kitchenRes.status === 201) {
+            kitchenNotified = true;
+            kitchenInternalId = kData.orderId || "";
+            console.log(`[CUSTOMER] Kitchen AI acknowledged order ${ref}:`, kData);
+
+            // Update database and cache with acknowledgement
+            try {
+              await connectToDatabase();
+              await Order.updateOne(
+                { orderId: ref },
+                {
+                  $set: {
+                    kitchenAcknowledged: true,
+                    kitchenNotified: true,
+                    kitchenOrderId: kitchenInternalId,
+                  },
+                }
+              );
+            } catch (uErr) {
+              console.warn("DB update acknowledgement warning:", uErr);
+            }
+
+            const inMemory = activeOrders.get(ref);
+            if (inMemory) {
+              inMemory.kitchenAcknowledged = true;
+              inMemory.kitchenNotified = true;
+              inMemory.kitchenOrderId = kitchenInternalId;
+            }
+          }
+        } else {
+          console.warn(`[CUSTOMER] Kitchen webhook returned HTTP ${kitchenRes.status}`);
+        }
+      } catch (kErr: any) {
+        console.warn(`[CUSTOMER] Kitchen order webhook skipped or unreachable: ${kErr?.message || kErr}`);
+      }
+    }
 
     return NextResponse.json(
       {
@@ -77,7 +153,7 @@ export async function POST(req: NextRequest) {
         orderId: ref,
         orderReference: ref,
         status: "RECEIVED",
-        kitchenAcknowledged: false,
+        kitchenAcknowledged: kitchenNotified,
         message: "Order placed successfully",
       },
       { status: 201 }

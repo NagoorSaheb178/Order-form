@@ -5,7 +5,8 @@ export type OrderStatus =
   | "RECEIVED"
   | "PREPARING"
   | "READY"
-  | "SERVED";
+  | "SERVED"
+  | "CANCELLED";
 
 const OrderItemSchema = new Schema(
   {
@@ -18,6 +19,16 @@ const OrderItemSchema = new Schema(
   { _id: false }
 );
 
+const StatusHistorySchema = new Schema(
+  {
+    previousStatus: { type: String },
+    newStatus: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now },
+    source: { type: String, default: "KITCHEN_AI" },
+  },
+  { _id: false }
+);
+
 const OrderSchema = new Schema(
   {
     orderId: { type: String, required: true, index: true },
@@ -25,10 +36,13 @@ const OrderSchema = new Schema(
     tableNo: { type: Number, required: true },
     status: {
       type: String,
-      enum: ["SUBMITTED", "RECEIVED", "PREPARING", "READY", "SERVED"],
+      enum: ["SUBMITTED", "RECEIVED", "PREPARING", "READY", "SERVED", "CANCELLED"],
       default: "RECEIVED",
     },
     kitchenAcknowledged: { type: Boolean, default: false },
+    kitchenNotified: { type: Boolean, default: false },
+    kitchenOrderId: { type: String, default: "" },
+    statusHistory: [StatusHistorySchema],
 
     // Backwards-compatible aliases
     orderReference: { type: String },

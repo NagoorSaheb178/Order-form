@@ -52,13 +52,56 @@ export default function OrderPage() {
   const [submitError, setSubmitError] = useState<string>("");
   const [latestOrder, setLatestOrder] = useState<PlacedOrder | null>(null);
 
+  // Restore latest order from backend database on page load / refresh
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlOrderId = urlParams.get("orderId") || urlParams.get("ref");
+      const storedOrderId = localStorage.getItem("customer_latest_order_id");
+      const targetId = urlOrderId || storedOrderId;
+
+      if (!targetId) return;
+
+      const fetchLatestFromDb = async () => {
+        try {
+          const res = await fetch(`/api/orders/status?orderId=${targetId}`);
+          const data = await res.json();
+          if (data.success && data.order) {
+            const restoredOrder: PlacedOrder = {
+              order_reference: data.order.orderId,
+              orderId: data.order.orderId,
+              restaurantId: data.order.restaurantId,
+              table_number: data.order.tableNo,
+              status: data.order.status,
+              kitchenAcknowledged: !!(data.order.kitchenAcknowledged || data.order.kitchenNotified),
+              items: data.order.items || [],
+              order_note: data.order.orderNote || "",
+              subtotal: data.order.totalAmount || 0,
+              created_at: data.order.createdAt,
+              updated_at: data.order.updatedAt,
+            };
+            setTableNumber(data.order.tableNo);
+            setLatestOrder(restoredOrder);
+            setScreen("status");
+          }
+        } catch (e) {
+          console.warn("[CUSTOMER] Could not restore order on mount:", e);
+        }
+      };
+
+      fetchLatestFromDb();
+    } catch (e) {}
+  }, []);
+
   // Realtime order progress listener (Kitchen -> Customer)
   React.useEffect(() => {
     if (!latestOrder?.order_reference) return;
 
     const ref = latestOrder.order_reference;
 
-    // Fetch latest status
+    // Fetch latest real status from database/backend
     const pollStatus = async () => {
       try {
         const res = await fetch(`/api/orders/status?orderId=${ref}`);
@@ -69,14 +112,17 @@ export default function OrderPage() {
               ? {
                   ...prev,
                   status: data.order.status,
-                  kitchenAcknowledged: !!data.order.kitchenAcknowledged,
+                  kitchenAcknowledged: !!(data.order.kitchenAcknowledged || data.order.kitchenNotified),
                 }
               : prev
           );
         }
       } catch (e) {}
     };
+
     pollStatus();
+    // Continuous polling fallback every 3 seconds to guarantee updates
+    const pollTimer = setInterval(pollStatus, 3000);
 
     let sse: EventSource | null = null;
     try {
@@ -85,7 +131,7 @@ export default function OrderPage() {
         try {
           const payload = JSON.parse(event.data);
           if (
-            payload.event === "ORDER_STATUS_UPDATED" &&
+            (payload.event === "ORDER_STATUS_UPDATED" || payload.event === "order.status_changed") &&
             (payload.orderId === ref || payload.orderId === latestOrder.orderId)
           ) {
             setLatestOrder((prev) =>
@@ -93,7 +139,10 @@ export default function OrderPage() {
                 ? {
                     ...prev,
                     status: payload.status,
-                    kitchenAcknowledged: !!payload.kitchenAcknowledged,
+                    kitchenAcknowledged:
+                      payload.kitchenAcknowledged !== undefined
+                        ? !!payload.kitchenAcknowledged
+                        : prev.kitchenAcknowledged,
                   }
                 : prev
             );
@@ -103,6 +152,7 @@ export default function OrderPage() {
     } catch (e) {}
 
     return () => {
+      clearInterval(pollTimer);
       if (sse) sse.close();
     };
   }, [latestOrder?.order_reference]);
@@ -257,6 +307,15 @@ export default function OrderPage() {
         subtotal: cartSubtotal,
         created_at: now.toISOString(),
       };
+
+      try {
+        localStorage.setItem("customer_latest_order_id", confirmedOrder.order_reference);
+        if (typeof window !== "undefined") {
+          const u = new URL(window.location.href);
+          u.searchParams.set("orderId", confirmedOrder.order_reference);
+          window.history.replaceState(null, "", u.toString());
+        }
+      } catch (e) {}
 
       setLatestOrder(confirmedOrder);
       setCart([]);
