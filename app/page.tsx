@@ -92,7 +92,11 @@ export default function OrderPage() {
 
       const targetTable = urlTableNo || storedTableNo;
       if (targetTable && !tableNumber) {
-        setTableNumber(Number(targetTable));
+        const parsedT = Number(targetTable);
+        if (Number.isInteger(parsedT) && parsedT > 0) {
+          setTableNumber(parsedT);
+          setManualTableInput(String(parsedT));
+        }
       }
 
       // If customer has not placed any orders, do not fetch historical orders
@@ -374,6 +378,8 @@ export default function OrderPage() {
       localStorage.setItem("customer_table_number", String(selectedNum));
       if (typeof window !== "undefined") {
         const u = new URL(window.location.href);
+        u.searchParams.set("tableNo", String(selectedNum));
+        u.searchParams.delete("table");
         u.searchParams.delete("orderId");
         u.searchParams.delete("ref");
         window.history.replaceState(null, "", u.toString());
@@ -388,6 +394,15 @@ export default function OrderPage() {
     setTableNumber(num);
     setManualTableInput(String(num));
     setTableError("");
+    try {
+      localStorage.setItem("customer_table_number", String(num));
+      if (typeof window !== "undefined") {
+        const u = new URL(window.location.href);
+        u.searchParams.set("tableNo", String(num));
+        u.searchParams.delete("table");
+        window.history.replaceState(null, "", u.toString());
+      }
+    } catch (e) {}
   };
 
   // Submit order to API
@@ -578,6 +593,15 @@ export default function OrderPage() {
                       if (Number.isInteger(num) && num > 0) {
                         setTableNumber(num);
                         setTableError("");
+                        try {
+                          localStorage.setItem("customer_table_number", String(num));
+                          if (typeof window !== "undefined") {
+                            const u = new URL(window.location.href);
+                            u.searchParams.set("tableNo", String(num));
+                            u.searchParams.delete("table");
+                            window.history.replaceState(null, "", u.toString());
+                          }
+                        } catch (err) {}
                       } else {
                         setTableNumber(null);
                       }
@@ -624,9 +648,18 @@ export default function OrderPage() {
                   >
                     Aster &amp; Olive
                   </h1>
-                  <span className="inline-block text-xs font-medium text-[#59634a] bg-[#edf0e7] px-2 py-0.5 rounded-full mt-0.5">
-                    Table {tableNumber || 1}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScreen("welcome");
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-[#59634a] bg-[#edf0e7] hover:bg-[#e2e7da] px-2 py-0.5 rounded-full mt-0.5 cursor-pointer transition-colors"
+                    title="Change table"
+                  >
+                    <span>Table {tableNumber || 1}</span>
+                    <span className="text-[10px] opacity-60">✎</span>
+                  </button>
                 </div>
                 <button
                   id="open-cart"
