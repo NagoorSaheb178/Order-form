@@ -4,15 +4,22 @@ import fs from "fs";
 import path from "path";
 
 // Fix for Node.js / Windows where local ISP or router DNS blocks SRV queries
-try {
-  dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);
-} catch (e) {
-  // ignore if dns server setting is restricted
+// NEVER set custom DNS on Vercel / Linux cloud serverless where outbound port 53 is blocked
+if (!process.env.VERCEL && process.platform === "win32") {
+  try {
+    dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);
+  } catch (e) {
+    // ignore if dns server setting is restricted
+  }
 }
 
 function getMongoUri(): string {
-  // 1. Read from process.env.MONGODB_URI
-  let uri = process.env.MONGODB_URI;
+  // 1. Read from process.env (check all common alias names)
+  let uri =
+    process.env.MONGODB_URI ||
+    process.env.MONGODB_URL ||
+    process.env.MONGO_URI ||
+    process.env.DATABASE_URL;
 
   // 2. Fallback to .env.local if process.env is not yet populated
   if (!uri) {
@@ -63,7 +70,9 @@ export async function connectToDatabase() {
   const uri = getMongoUri();
 
   if (!uri) {
-    throw new Error("Please define MONGODB_URI in .env.local");
+    throw new Error(
+      "Missing MONGODB_URI environment variable. Please configure MONGODB_URI in your Vercel Project Settings (Settings -> Environment Variables) and redeploy."
+    );
   }
 
   // Force clean reset if the target URI changed
@@ -90,8 +99,8 @@ export async function connectToDatabase() {
     cached.promise = mongoose
       .connect(uri, {
         dbName: "restaurant_orders",
-        serverSelectionTimeoutMS: 6000,
-        connectTimeoutMS: 6000,
+        serverSelectionTimeoutMS: 10000,
+        connectTimeoutMS: 10000,
       })
       .then((m) => {
         return m;

@@ -46,15 +46,29 @@ export async function POST(req: NextRequest) {
     };
 
     // Save directly to MongoDB
+    let dbSaved = false;
+    let dbErrorMessage = "";
     try {
       await connectToDatabase();
       const order = await Order.create(orderData);
       if (order?._id) {
         savedOrderId = order.orderId || ref;
+        dbSaved = true;
         console.log(`✅ Order ${ref} (Table ${tNum}) saved to MongoDB successfully.`);
       }
     } catch (dbErr: any) {
-      console.warn("MongoDB save warning:", dbErr?.message || dbErr);
+      dbErrorMessage = dbErr?.message || String(dbErr);
+      console.error("❌ MongoDB save error:", dbErrorMessage);
+    }
+
+    if (!dbSaved) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Could not save order to database: ${dbErrorMessage}. Please ensure MONGODB_URI is configured in Vercel Environment Variables.`,
+        },
+        { status: 500 }
+      );
     }
 
     // Store in active in-memory cache for instant status queries

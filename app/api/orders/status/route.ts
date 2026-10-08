@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. Query MongoDB strictly for requestedIds belonging to this customer
+    let dbErrorMsg = "";
     try {
       await connectToDatabase();
 
@@ -54,7 +55,8 @@ export async function GET(req: NextRequest) {
         activeOrders.set(oId, dbOrder);
       }
     } catch (dbErr: any) {
-      console.warn("MongoDB query skipped/failed:", dbErr?.message || dbErr);
+      dbErrorMsg = dbErr?.message || String(dbErr);
+      console.error("MongoDB query error in /api/orders/status:", dbErrorMsg);
     }
 
     const allOrdersList = Array.from(ordersMap.values()).sort((a, b) => {
@@ -64,8 +66,18 @@ export async function GET(req: NextRequest) {
     });
 
     if (allOrdersList.length === 0) {
+      if (dbErrorMsg) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Database error: ${dbErrorMsg}. Please ensure MONGODB_URI is set in Vercel Project Settings.`,
+            orders: [],
+          },
+          { status: 500 }
+        );
+      }
       return NextResponse.json(
-        { success: false, message: "No orders found", orders: [] },
+        { success: false, message: `No active orders found for: ${requestedIds.join(", ")}`, orders: [] },
         { status: 404 }
       );
     }
