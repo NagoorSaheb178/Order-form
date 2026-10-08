@@ -1,18 +1,10 @@
 import "./globals.css";
 import "../styles/custom.css";
 import type { Metadata } from "next";
-<<<<<<< HEAD
 
 export const metadata: Metadata = {
   title: "Aster & Olive — Dine-in ordering",
   description: "Dine-in ordering directly from our seasonal menu.",
-=======
-import { OrderProvider } from "@/components/OrderContext";
-
-export const metadata: Metadata = {
-  title: "Restaurant QR Ordering",
-  description: "Scan, order, and enjoy.",
->>>>>>> 077dc146ac0dbb535218dd1a2cad3690b33bebd5
 };
 
 export default function RootLayout({
@@ -22,7 +14,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-<<<<<<< HEAD
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -32,13 +23,6 @@ export default function RootLayout({
         />
       </head>
       <body>{children}</body>
-=======
-      <body style={{ background: "#f3f4f6" }}>
-        <OrderProvider>
-          {children}
-        </OrderProvider>
-      </body>
->>>>>>> 077dc146ac0dbb535218dd1a2cad3690b33bebd5
     </html>
   );
 }

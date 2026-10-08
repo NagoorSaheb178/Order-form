@@ -1,6 +1,5 @@
 import mongoose, { Schema, models, model } from "mongoose";
 
-<<<<<<< HEAD
 export type OrderStatus =
   | "SUBMITTED"
   | "RECEIVED"
@@ -8,25 +7,19 @@ export type OrderStatus =
   | "READY"
   | "SERVED";
 
-=======
->>>>>>> 077dc146ac0dbb535218dd1a2cad3690b33bebd5
 const OrderItemSchema = new Schema(
   {
     id: String,
     name: String,
     price: Number,
     quantity: Number,
-<<<<<<< HEAD
     note: { type: String, default: "" },
-=======
->>>>>>> 077dc146ac0dbb535218dd1a2cad3690b33bebd5
   },
   { _id: false }
 );
 
 const OrderSchema = new Schema(
   {
-<<<<<<< HEAD
     orderId: { type: String, required: true, index: true },
     restaurantId: { type: String, required: true, default: "REST-001", index: true },
     tableNo: { type: Number, required: true },
@@ -45,18 +38,12 @@ const OrderSchema = new Schema(
     items: [OrderItemSchema],
     totalAmount: { type: Number, default: 0 },
     orderNote: { type: String, default: "" },
-=======
-    phone: { type: String, required: true },
-    items: [OrderItemSchema],
-    totalAmount: Number,
->>>>>>> 077dc146ac0dbb535218dd1a2cad3690b33bebd5
   },
   {
     timestamps: true,
   }
 );
 
-<<<<<<< HEAD
 // Middleware to keep aliases synchronized
 OrderSchema.pre("save", function (next) {
   if (this.orderId && !this.orderReference) {
@@ -74,6 +61,4 @@ OrderSchema.pre("save", function (next) {
   next();
 });
 
-=======
->>>>>>> 077dc146ac0dbb535218dd1a2cad3690b33bebd5
 export const Order = models.Order || model("Order", OrderSchema);
