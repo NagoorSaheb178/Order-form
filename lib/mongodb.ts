@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+<<<<<<< HEAD
 import dns from "dns";
 import fs from "fs";
 import path from "path";
@@ -40,16 +41,33 @@ interface MongooseCache {
   conn: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
   lastUri: string | null;
+=======
+
+const MONGODB_URI = process.env.MONGODB_URI as string;
+
+if (!MONGODB_URI) {
+  throw new Error("Please define MONGODB_URI in .env.local");
+}
+
+interface MongooseCache {
+  conn: typeof mongoose | null;
+  promise: Promise<typeof mongoose> | null;
+>>>>>>> 077dc146ac0dbb535218dd1a2cad3690b33bebd5
 }
 
 let cached = (global as any).mongoose as MongooseCache | undefined;
 
 if (!cached) {
+<<<<<<< HEAD
   cached = { conn: null, promise: null, lastUri: null };
+=======
+  cached = { conn: null, promise: null };
+>>>>>>> 077dc146ac0dbb535218dd1a2cad3690b33bebd5
   (global as any).mongoose = cached;
 }
 
 export async function connectToDatabase() {
+<<<<<<< HEAD
   const uri = getMongoUri();
 
   if (!uri) {
@@ -106,4 +124,14 @@ export async function connectToDatabase() {
     }
     throw err;
   }
+=======
+  if (cached?.conn) return cached.conn;
+
+  if (!cached?.promise) {
+    cached!.promise = mongoose.connect(MONGODB_URI).then((mongoose) => mongoose);
+  }
+
+  cached!.conn = await cached!.promise;
+  return cached!.conn;
+>>>>>>> 077dc146ac0dbb535218dd1a2cad3690b33bebd5
 }

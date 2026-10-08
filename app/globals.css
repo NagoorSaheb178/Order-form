@@ -3,6 +3,12 @@
 @tailwind utilities;
 
 body {
+<<<<<<< HEAD
   background-color: #faf7f0;
   color: #252720;
 }
+=======
+  @apply bg-slate-950 text-slate-100;
+}
+
+>>>>>>> 077dc146ac0dbb535218dd1a2cad3690b33bebd5
