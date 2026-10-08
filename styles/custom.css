@@ -610,6 +610,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   color: var(--olive);
 }
 
+.menu-layout {
+  padding-top: 20px;
+  padding-bottom: 40px;
+}
+
 .desktop-cart {
   display: none;
 }
@@ -618,25 +623,29 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 @media (min-width: 768px) {
   .menu-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-columns: minmax(0, 1fr) 320px;
     gap: 24px;
     align-items: start;
+    padding-top: 24px;
+    padding-bottom: 56px;
   }
   .menu-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     padding-bottom: 30px;
   }
   .menu-card {
-    grid-template-columns: 96px 1fr;
+    grid-template-columns: 104px 1fr;
+    min-width: 0;
   }
   .menu-card img {
-    width: 96px;
-    height: 114px;
+    width: 104px;
+    height: 118px;
   }
   .desktop-cart {
     display: block;
     position: sticky;
-    top: 130px;
+    top: 175px;
+    padding-top: 28px;
   }
   .cart-bar {
     display: none !important;
@@ -653,6 +662,20 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   }
   .sheet.detail.open {
     transform: translateX(0);
+  }
+}
+
+@media (min-width: 1024px) {
+  .menu-layout {
+    grid-template-columns: minmax(0, 1fr) 350px;
+    gap: 28px;
+  }
+  .menu-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .desktop-cart {
+    top: 180px;
   }
 }
 

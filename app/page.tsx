@@ -419,7 +419,7 @@ export default function OrderPage() {
                 </div>
                 <button
                   id="open-cart"
-                  className="secondary flex items-center gap-1.5 px-3 py-1.5 text-sm"
+                  className="secondary md:hidden flex items-center gap-1.5 px-3 py-1.5 text-sm"
                   type="button"
                   onClick={() => setIsCartSheetOpen(true)}
                   aria-label="View current order"
@@ -481,7 +481,7 @@ export default function OrderPage() {
             <div>
               <p
                 id="menu-result"
-                className="text-xs sm:text-sm text-[#73766c] pt-4"
+                className="text-xs sm:text-sm text-[#73766c] mb-3 pb-1"
                 aria-live="polite"
               >
                 {filteredItems.length}{" "}
