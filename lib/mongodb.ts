@@ -5,7 +5,7 @@ import path from "path";
 
 // Fix for Node.js / Windows where local ISP or router DNS blocks SRV queries
 // NEVER set custom DNS on Vercel / Linux cloud serverless where outbound port 53 is blocked
-if (!process.env.VERCEL && process.platform === "win32") {
+if (process.env.NODE_ENV !== "production" && !process.env.VERCEL && process.platform === "win32") {
   try {
     dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);
   } catch (e) {

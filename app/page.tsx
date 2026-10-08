@@ -493,7 +493,7 @@ export default function OrderPage() {
     } catch (err: any) {
       console.error("Order submission error:", err);
       setIsSubmitting(false);
-      setSubmitError("We could not send your order. Please try again.");
+      setSubmitError(err?.message || "We could not send your order. Please try again.");
     }
   };
 
