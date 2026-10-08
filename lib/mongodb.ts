@@ -11,30 +11,38 @@ try {
 }
 
 function getMongoUri(): string {
-  const envPath = path.join(process.cwd(), ".env.local");
-  try {
-    if (fs.existsSync(envPath)) {
-      const content = fs.readFileSync(envPath, "utf-8");
-      const match = content.match(/^MONGODB_URI\s*=\s*(.+)$/m);
-      if (match && match[1]) {
-        let uri = match[1].trim();
-        if (
-          (uri.startsWith('"') && uri.endsWith('"')) ||
-          (uri.startsWith("'") && uri.endsWith("'"))
-        ) {
-          uri = uri.slice(1, -1);
+  // 1. Read from process.env.MONGODB_URI
+  let uri = process.env.MONGODB_URI;
+
+  // 2. Fallback to .env.local if process.env is not yet populated
+  if (!uri) {
+    const envPath = path.join(process.cwd(), ".env.local");
+    try {
+      if (fs.existsSync(envPath)) {
+        const content = fs.readFileSync(envPath, "utf-8");
+        const match = content.match(/^MONGODB_URI\s*=\s*(.+)$/m);
+        if (match && match[1]) {
+          uri = match[1].trim();
         }
-        return uri.replace(/<([^>]+)>/g, "$1");
       }
+    } catch (e) {
+      // ignore file read error
     }
-  } catch (e) {
-    // continue to process.env fallback
   }
 
-  const envUri =
-    process.env.MONGODB_URI ||
-    "mongodb://menu:Nagoor271@ac-jxpidhb-shard-00-00.gg7r1on.mongodb.net:27017,ac-jxpidhb-shard-00-01.gg7r1on.mongodb.net:27017,ac-jxpidhb-shard-00-02.gg7r1on.mongodb.net:27017/restaurant_orders?ssl=true&replicaSet=atlas-128119-shard-0&authSource=admin&appName=Test";
-  return envUri.replace(/<([^>]+)>/g, "$1");
+  if (!uri) {
+    return "";
+  }
+
+  // Strip wrapping quotes
+  if (
+    (uri.startsWith('"') && uri.endsWith('"')) ||
+    (uri.startsWith("'") && uri.endsWith("'"))
+  ) {
+    uri = uri.slice(1, -1);
+  }
+
+  return uri.trim().replace(/<([^>]+)>/g, "$1");
 }
 
 

@@ -39,9 +39,8 @@ export async function GET(req: NextRequest) {
       // Listen to status updates
       statusListener = (event: OrderStatusEvent) => {
         const matchesId = targetIds.length > 0 && targetIds.includes(event.orderId);
-        const matchesTable = tableNo && (event as any).tableNo == tableNo;
 
-        if (matchesId || matchesTable || targetIds.length === 0) {
+        if (matchesId) {
           send({
             event: "order.status_changed",
             orderId: event.orderId,

@@ -95,61 +95,45 @@ export default function OrderPage() {
         setTableNumber(Number(targetTable));
       }
 
-      if (allIds.length === 0 && !targetTable) return;
+      // If customer has not placed any orders, do not fetch historical orders
+      if (allIds.length === 0) return;
 
       const fetchOrdersFromDb = async () => {
         try {
-          const queryParts: string[] = [];
-          if (allIds.length > 0) {
-            queryParts.push(`orderId=${encodeURIComponent(allIds.join(","))}`);
-          }
-          if (targetTable) {
-            queryParts.push(`tableNo=${encodeURIComponent(targetTable)}`);
-          }
-
-          const res = await fetch(`/api/orders/status?${queryParts.join("&")}`);
+          const res = await fetch(`/api/orders/status?orderId=${encodeURIComponent(allIds.join(","))}`);
           const data = await res.json();
 
           if (data.success && data.orders && data.orders.length > 0) {
-            const mappedOrders: PlacedOrder[] = data.orders.map((o: any) => ({
-              order_reference: o.orderId,
-              orderId: o.orderId,
-              restaurantId: o.restaurantId,
-              table_number: o.tableNo,
-              status: o.status,
-              kitchenAcknowledged: !!(o.kitchenAcknowledged || o.kitchenNotified),
-              items: o.items || [],
-              order_note: o.orderNote || "",
-              subtotal: o.totalAmount || 0,
-              created_at: o.createdAt,
-              updated_at: o.updatedAt,
-            }));
+            const customerOnly = data.orders.filter((o: any) =>
+              allIds.includes(o.orderId) || allIds.includes(o.orderReference)
+            );
 
-            setTableOrders(mappedOrders);
-            const primary = mappedOrders[0];
-            setLatestOrder(primary);
-            setSelectedOrderId(primary.order_reference);
-            setTableNumber(primary.table_number);
-            setScreen("status");
-          } else if (data.success && data.order) {
-            const restoredOrder: PlacedOrder = {
-              order_reference: data.order.orderId,
-              orderId: data.order.orderId,
-              restaurantId: data.order.restaurantId,
-              table_number: data.order.tableNo,
-              status: data.order.status,
-              kitchenAcknowledged: !!(data.order.kitchenAcknowledged || data.order.kitchenNotified),
-              items: data.order.items || [],
-              order_note: data.order.orderNote || "",
-              subtotal: data.order.totalAmount || 0,
-              created_at: data.order.createdAt,
-              updated_at: data.order.updatedAt,
-            };
-            setTableOrders([restoredOrder]);
-            setLatestOrder(restoredOrder);
-            setSelectedOrderId(restoredOrder.order_reference);
-            setTableNumber(data.order.tableNo);
-            setScreen("status");
+            if (customerOnly.length > 0) {
+              const mappedOrders: PlacedOrder[] = customerOnly.map((o: any) => ({
+                order_reference: o.orderId,
+                orderId: o.orderId,
+                restaurantId: o.restaurantId,
+                table_number: o.tableNo,
+                status: o.status,
+                kitchenAcknowledged: !!(o.kitchenAcknowledged || o.kitchenNotified),
+                items: (o.items || []).map((it: any) => ({
+                  ...it,
+                  qty: Number(it.qty || it.quantity || 1),
+                  quantity: Number(it.qty || it.quantity || 1),
+                })),
+                order_note: o.orderNote || "",
+                subtotal: o.totalAmount || 0,
+                created_at: o.createdAt,
+                updated_at: o.updatedAt,
+              }));
+
+              setTableOrders(mappedOrders);
+              const primary = mappedOrders[0];
+              setLatestOrder(primary);
+              setSelectedOrderId(primary.order_reference);
+              setTableNumber(primary.table_number);
+              setScreen("status");
+            }
           }
         } catch (e) {
           console.warn("[CUSTOMER] Could not restore orders on mount:", e);
@@ -160,7 +144,7 @@ export default function OrderPage() {
     } catch (e) {}
   }, []);
 
-  // Realtime order progress listener (Kitchen -> Customer) for all table orders
+  // Realtime order progress listener (Kitchen -> Customer) for this customer's orders
   React.useEffect(() => {
     const allKnownIds = Array.from(
       new Set(
@@ -172,57 +156,37 @@ export default function OrderPage() {
       )
     );
 
-    if (allKnownIds.length === 0 && !tableNumber) return;
+    // Only listen for orders this customer actually placed
+    if (allKnownIds.length === 0) return;
 
-    const queryParts: string[] = [];
-    if (allKnownIds.length > 0) {
-      queryParts.push(`orderId=${encodeURIComponent(allKnownIds.join(","))}`);
-    }
-    if (tableNumber) {
-      queryParts.push(`tableNo=${encodeURIComponent(tableNumber)}`);
-    }
-    const queryString = queryParts.join("&");
+    const queryString = `orderId=${encodeURIComponent(allKnownIds.join(","))}`;
 
-    // Fetch latest real statuses for all table orders
+    // Fetch latest real statuses strictly for this customer's orders
     const pollStatus = async () => {
       try {
         const res = await fetch(`/api/orders/status?${queryString}`);
         const data = await res.json();
         if (data.success && data.orders && Array.isArray(data.orders)) {
           setTableOrders((prev) => {
-            const prevMap = new Map(prev.map((o) => [o.order_reference, o]));
-
-            for (const d of data.orders) {
-              const ref = d.orderId;
-              const existing = prevMap.get(ref);
-              if (existing) {
-                prevMap.set(ref, {
+            return prev.map((existing) => {
+              const fresh = data.orders.find(
+                (d: any) =>
+                  d.orderId === existing.order_reference || d.orderId === existing.orderId
+              );
+              if (fresh) {
+                return {
                   ...existing,
-                  status: d.status,
-                  kitchenAcknowledged: !!(d.kitchenAcknowledged || d.kitchenNotified),
-                  updated_at: d.updatedAt,
-                });
-              } else {
-                prevMap.set(ref, {
-                  order_reference: d.orderId,
-                  orderId: d.orderId,
-                  restaurantId: d.restaurantId,
-                  table_number: d.tableNo,
-                  status: d.status,
-                  kitchenAcknowledged: !!(d.kitchenAcknowledged || d.kitchenNotified),
-                  items: d.items || [],
-                  order_note: d.orderNote || "",
-                  subtotal: d.totalAmount || 0,
-                  created_at: d.createdAt,
-                  updated_at: d.updatedAt,
-                });
+                  status: fresh.status,
+                  kitchenAcknowledged: !!(fresh.kitchenAcknowledged || fresh.kitchenNotified),
+                  updated_at: fresh.updatedAt,
+                  items: (fresh.items || existing.items || []).map((it: any) => ({
+                    ...it,
+                    qty: Number(it.qty || it.quantity || 1),
+                    quantity: Number(it.qty || it.quantity || 1),
+                  })),
+                };
               }
-            }
-
-            return Array.from(prevMap.values()).sort((a, b) => {
-              const tA = new Date(a.created_at || 0).getTime();
-              const tB = new Date(b.created_at || 0).getTime();
-              return tB - tA;
+              return existing;
             });
           });
 
@@ -386,6 +350,25 @@ export default function OrderPage() {
     }
     setTableNumber(selectedNum);
     setTableError("");
+
+    // Starting new diner session: clear any previous visitor's orders
+    setTableOrders([]);
+    setLatestOrder(null);
+    setSelectedOrderId("");
+    setCart([]);
+    setOrderNote("");
+    try {
+      localStorage.removeItem("customer_latest_order_id");
+      localStorage.removeItem("customer_table_orders");
+      localStorage.setItem("customer_table_number", String(selectedNum));
+      if (typeof window !== "undefined") {
+        const u = new URL(window.location.href);
+        u.searchParams.delete("orderId");
+        u.searchParams.delete("ref");
+        window.history.replaceState(null, "", u.toString());
+      }
+    } catch (e) {}
+
     setScreen("menu");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -1392,7 +1375,7 @@ export default function OrderPage() {
                 {activeOrder.items.map((x, i) => (
                   <div key={i} className="text-xs sm:text-sm py-1 text-[#252720] flex justify-between">
                     <span>
-                      {x.qty} × {x.name}
+                      {(x.qty || (x as any).quantity || 1)} × {x.name}
                       {x.note && (
                         <span className="text-[#73766c] block text-[11px]">
                           “{x.note}”
@@ -1400,7 +1383,7 @@ export default function OrderPage() {
                       )}
                     </span>
                     <span className="text-[#73766c]">
-                      {formatMoney(x.price * x.qty)}
+                      {formatMoney(x.price * (x.qty || (x as any).quantity || 1))}
                     </span>
                   </div>
                 ))}
@@ -1464,7 +1447,7 @@ export default function OrderPage() {
                             </span>
                           </div>
                           <p className="text-xs text-[#73766c] mt-1">
-                            {ord.items.map((it) => `${it.qty}× ${it.name}`).join(", ")}
+                            {ord.items.map((it) => `${it.qty || (it as any).quantity || 1}× ${it.name}`).join(", ")}
                           </p>
                         </div>
 
@@ -1532,7 +1515,8 @@ export default function OrderPage() {
                         ].filter(Boolean) as string[]
                       )
                     );
-                    const q = `orderId=${encodeURIComponent(allKnownIds.join(","))}&tableNo=${activeOrder.table_number}`;
+                    if (allKnownIds.length === 0) return;
+                    const q = `orderId=${encodeURIComponent(allKnownIds.join(","))}`;
                     const res = await fetch(`/api/orders/status?${q}`);
                     const data = await res.json();
                     if (data.success && data.orders && Array.isArray(data.orders)) {
@@ -1544,7 +1528,11 @@ export default function OrderPage() {
                           table_number: o.tableNo,
                           status: o.status,
                           kitchenAcknowledged: !!(o.kitchenAcknowledged || o.kitchenNotified),
-                          items: o.items || [],
+                          items: (o.items || []).map((it: any) => ({
+                            ...it,
+                            qty: Number(it.qty || it.quantity || 1),
+                            quantity: Number(it.qty || it.quantity || 1),
+                          })),
                           order_note: o.orderNote || "",
                           subtotal: o.totalAmount || 0,
                           created_at: o.createdAt,
@@ -1556,6 +1544,32 @@ export default function OrderPage() {
                 }}
               >
                 Refresh status
+              </button>
+              <button
+                id="new-session-btn"
+                className="secondary flex-1"
+                type="button"
+                onClick={() => {
+                  setTableOrders([]);
+                  setLatestOrder(null);
+                  setSelectedOrderId("");
+                  setCart([]);
+                  setOrderNote("");
+                  try {
+                    localStorage.removeItem("customer_latest_order_id");
+                    localStorage.removeItem("customer_table_orders");
+                    if (typeof window !== "undefined") {
+                      const u = new URL(window.location.href);
+                      u.searchParams.delete("orderId");
+                      u.searchParams.delete("ref");
+                      window.history.replaceState(null, "", u.toString());
+                    }
+                  } catch (e) {}
+                  setScreen("welcome");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              >
+                Finish &amp; New diner
               </button>
             </div>
           </div>

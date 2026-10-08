@@ -12,59 +12,46 @@ export async function GET(req: NextRequest) {
     const orderIdParam = searchParams.get("orderId");
     const tableNoParam = searchParams.get("tableNo");
 
-    if (!orderIdParam && !tableNoParam) {
-      return NextResponse.json(
-        { success: false, message: "Missing orderId or tableNo query parameter" },
-        { status: 400 }
-      );
-    }
-
     const requestedIds = orderIdParam
       ? orderIdParam.split(",").map((s) => s.trim()).filter(Boolean)
       : [];
 
-    const parsedTableNo = tableNoParam ? Number(tableNoParam) : null;
+    // Never return historical orders of past diners if customer has no order IDs
+    if (requestedIds.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "No active orders found for this session", orders: [] },
+        { status: 404 }
+      );
+    }
 
+    const parsedTableNo = tableNoParam ? Number(tableNoParam) : null;
     const ordersMap = new Map<string, any>();
 
-    // 1. Gather matching orders from in-memory cache
+    // 1. Gather matching orders from in-memory cache strictly for requestedIds
     for (const o of activeOrders.values()) {
       const oId = o.orderId || o.orderReference;
-      const oTable = Number(o.tableNo || o.tableNumber);
-
-      const matchesId = requestedIds.length > 0 && (requestedIds.includes(oId) || requestedIds.includes(o.orderReference));
-      const matchesTable = parsedTableNo !== null && oTable === parsedTableNo;
-
-      if (matchesId || matchesTable) {
+      if (requestedIds.includes(oId) || requestedIds.includes(o.orderReference)) {
         ordersMap.set(oId, o);
       }
     }
 
-    // 2. Query MongoDB for requested orders and/or table orders
+    // 2. Query MongoDB strictly for requestedIds belonging to this customer
     try {
       await connectToDatabase();
 
-      const queryOr: any[] = [];
-      if (requestedIds.length > 0) {
-        queryOr.push({ orderId: { $in: requestedIds } });
-        queryOr.push({ orderReference: { $in: requestedIds } });
-      }
-      if (parsedTableNo !== null) {
-        queryOr.push({ tableNo: parsedTableNo });
-        queryOr.push({ tableNumber: parsedTableNo });
-      }
+      const dbOrders = await Order.find({
+        $or: [
+          { orderId: { $in: requestedIds } },
+          { orderReference: { $in: requestedIds } },
+        ],
+      })
+        .sort({ createdAt: -1 })
+        .lean();
 
-      if (queryOr.length > 0) {
-        const dbOrders = await Order.find({ $or: queryOr })
-          .sort({ createdAt: -1 })
-          .limit(20)
-          .lean();
-
-        for (const dbOrder of dbOrders) {
-          const oId = dbOrder.orderId || dbOrder.orderReference;
-          ordersMap.set(oId, dbOrder);
-          activeOrders.set(oId, dbOrder);
-        }
+      for (const dbOrder of dbOrders) {
+        const oId = dbOrder.orderId || dbOrder.orderReference;
+        ordersMap.set(oId, dbOrder);
+        activeOrders.set(oId, dbOrder);
       }
     } catch (dbErr: any) {
       console.warn("MongoDB query skipped/failed:", dbErr?.message || dbErr);
@@ -78,12 +65,12 @@ export async function GET(req: NextRequest) {
 
     if (allOrdersList.length === 0) {
       return NextResponse.json(
-        { success: false, message: "No orders found" },
+        { success: false, message: "No orders found", orders: [] },
         { status: 404 }
       );
     }
 
-    // Determine primary order (first requested ID, or latest table order)
+    // Determine primary order (first requested ID, or latest order)
     let primary = allOrdersList[0];
     if (requestedIds.length > 0) {
       const match = allOrdersList.find(
@@ -99,7 +86,11 @@ export async function GET(req: NextRequest) {
       status: o.status || "RECEIVED",
       kitchenAcknowledged: !!(o.kitchenAcknowledged || o.kitchenNotified),
       kitchenNotified: !!(o.kitchenNotified || o.kitchenAcknowledged),
-      items: o.items || [],
+      items: (o.items || []).map((it: any) => ({
+        ...it,
+        qty: Number(it.qty || it.quantity || 1),
+        quantity: Number(it.qty || it.quantity || 1),
+      })),
       totalAmount: o.totalAmount || 0,
       orderNote: o.orderNote || "",
       statusHistory: o.statusHistory || [],
@@ -124,13 +115,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const secret =
-      process.env.CUSTOMER_STATUS_WEBHOOK_SECRET || "customer-secret-key-change-in-production";
+      process.env.CUSTOMER_STATUS_WEBHOOK_SECRET;
 
     const incomingSecret =
       req.headers.get("x-webhook-secret") ||
       req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
 
-    if (incomingSecret && incomingSecret !== secret) {
+    if (secret && incomingSecret !== secret) {
       console.warn("[CUSTOMER] Unauthorized status callback attempt");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

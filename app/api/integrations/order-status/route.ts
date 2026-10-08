@@ -9,14 +9,13 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   try {
     // 1. Authenticate the Kitchen request
-    const secret =
-      process.env.CUSTOMER_STATUS_WEBHOOK_SECRET || "customer-secret-key-change-in-production";
+    const secret = process.env.CUSTOMER_STATUS_WEBHOOK_SECRET;
 
     const incomingSecret =
       req.headers.get("x-webhook-secret") ||
       req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
 
-    if (incomingSecret !== secret) {
+    if (secret && incomingSecret !== secret) {
       console.warn("[CUSTOMER] Unauthorized status callback attempt");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
