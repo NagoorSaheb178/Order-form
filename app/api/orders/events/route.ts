@@ -2,22 +2,24 @@ import { NextRequest } from "next/server";
 import { orderEventBus, OrderStatusEvent } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const targetOrderId = searchParams.get("orderId");
   const tableNo = searchParams.get("tableNo");
 
-  if (!targetOrderId && !tableNo) {
-    return new Response("Missing orderId or tableNo parameter", { status: 400 });
-  }
-
   const targetIds = targetOrderId
     ? targetOrderId.split(",").map((s) => s.trim()).filter(Boolean)
     : [];
 
+  if (targetIds.length === 0 && !tableNo) {
+    return new Response("Missing orderId or tableNo parameter", { status: 400 });
+  }
+
   let isClosed = false;
   let heartbeatTimer: NodeJS.Timeout | null = null;
+  let autoCloseTimer: NodeJS.Timeout | null = null;
   let statusListener: ((event: OrderStatusEvent) => void) | null = null;
 
   const stream = new ReadableStream({
@@ -63,7 +65,7 @@ export async function GET(req: NextRequest) {
       orderEventBus.on("order_status", statusListener);
       orderEventBus.on("status_updated", statusListener);
 
-      // Heartbeat every 15 seconds to keep connection alive
+      // Heartbeat every 4 seconds to prevent Vercel idle proxy drops
       heartbeatTimer = setInterval(() => {
         if (isClosed) return;
         try {
@@ -71,12 +73,18 @@ export async function GET(req: NextRequest) {
         } catch (e) {
           cleanup();
         }
-      }, 15000);
+      }, 4000);
+
+      // Cleanly end the stream after 25s before Vercel cuts the lambda with ECONNRESET
+      autoCloseTimer = setTimeout(() => {
+        cleanup();
+      }, 25000);
 
       const cleanup = () => {
         if (isClosed) return;
         isClosed = true;
         if (heartbeatTimer) clearInterval(heartbeatTimer);
+        if (autoCloseTimer) clearTimeout(autoCloseTimer);
         if (statusListener) {
           orderEventBus.off("order.status_changed", statusListener);
           orderEventBus.off("order_status", statusListener);
@@ -92,6 +100,7 @@ export async function GET(req: NextRequest) {
     cancel() {
       isClosed = true;
       if (heartbeatTimer) clearInterval(heartbeatTimer);
+      if (autoCloseTimer) clearTimeout(autoCloseTimer);
       if (statusListener) {
         orderEventBus.off("order.status_changed", statusListener);
         orderEventBus.off("order_status", statusListener);
@@ -102,9 +111,10 @@ export async function GET(req: NextRequest) {
 
   return new Response(stream, {
     headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform, no-store, must-revalidate",
       Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
     },
   });
 }

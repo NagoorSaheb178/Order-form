@@ -254,6 +254,17 @@ export default function OrderPage() {
           }
         } catch (e) {}
       };
+
+      sse.onerror = () => {
+        // Vercel serverless closes SSE streams after its execution timeout.
+        // Close cleanly so browser does not display network errors; polling seamlessly maintains realtime updates.
+        if (sse) {
+          try {
+            sse.close();
+          } catch (e) {}
+          sse = null;
+        }
+      };
     } catch (e) {}
 
     return () => {
