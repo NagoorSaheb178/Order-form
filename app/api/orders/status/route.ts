@@ -1,78 +1,235 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Order } from "@/models/Order";
-import { activeOrders } from "@/lib/events";
+import { activeOrders, orderEventBus } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const orderId = searchParams.get("orderId");
+    const orderIdParam = searchParams.get("orderId");
+    const tableNoParam = searchParams.get("tableNo");
 
-    if (!orderId) {
+    if (!orderIdParam && !tableNoParam) {
       return NextResponse.json(
-        { success: false, message: "Missing orderId query parameter" },
+        { success: false, message: "Missing orderId or tableNo query parameter" },
         { status: 400 }
       );
     }
 
-    let order: any = activeOrders.get(orderId);
+    const requestedIds = orderIdParam
+      ? orderIdParam.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
 
-    // Also look up in-memory by alternative field
-    if (!order) {
-      for (const o of activeOrders.values()) {
-        if (o.orderId === orderId || o.orderReference === orderId) {
-          order = o;
-          break;
-        }
+    const parsedTableNo = tableNoParam ? Number(tableNoParam) : null;
+
+    const ordersMap = new Map<string, any>();
+
+    // 1. Gather matching orders from in-memory cache
+    for (const o of activeOrders.values()) {
+      const oId = o.orderId || o.orderReference;
+      const oTable = Number(o.tableNo || o.tableNumber);
+
+      const matchesId = requestedIds.length > 0 && (requestedIds.includes(oId) || requestedIds.includes(o.orderReference));
+      const matchesTable = parsedTableNo !== null && oTable === parsedTableNo;
+
+      if (matchesId || matchesTable) {
+        ordersMap.set(oId, o);
       }
     }
 
-    // Attempt to query latest order state from MongoDB if available
+    // 2. Query MongoDB for requested orders and/or table orders
     try {
       await connectToDatabase();
-      const dbOrder: any = await Order.findOne({
-        $or: [{ orderId }, { orderReference: orderId }],
-      }).lean();
 
-      if (dbOrder) {
-        order = dbOrder;
-        activeOrders.set(orderId, dbOrder);
+      const queryOr: any[] = [];
+      if (requestedIds.length > 0) {
+        queryOr.push({ orderId: { $in: requestedIds } });
+        queryOr.push({ orderReference: { $in: requestedIds } });
+      }
+      if (parsedTableNo !== null) {
+        queryOr.push({ tableNo: parsedTableNo });
+        queryOr.push({ tableNumber: parsedTableNo });
+      }
+
+      if (queryOr.length > 0) {
+        const dbOrders = await Order.find({ $or: queryOr })
+          .sort({ createdAt: -1 })
+          .limit(20)
+          .lean();
+
+        for (const dbOrder of dbOrders) {
+          const oId = dbOrder.orderId || dbOrder.orderReference;
+          ordersMap.set(oId, dbOrder);
+          activeOrders.set(oId, dbOrder);
+        }
       }
     } catch (dbErr: any) {
-      // Non-fatal warning: database might be connecting, starting up, or using memory cache
       console.warn("MongoDB query skipped/failed:", dbErr?.message || dbErr);
     }
 
-    if (!order) {
+    const allOrdersList = Array.from(ordersMap.values()).sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
+
+    if (allOrdersList.length === 0) {
       return NextResponse.json(
-        { success: false, message: "Order not found" },
+        { success: false, message: "No orders found" },
         { status: 404 }
       );
     }
 
+    // Determine primary order (first requested ID, or latest table order)
+    let primary = allOrdersList[0];
+    if (requestedIds.length > 0) {
+      const match = allOrdersList.find(
+        (o) => o.orderId === requestedIds[0] || o.orderReference === requestedIds[0]
+      );
+      if (match) primary = match;
+    }
+
+    const formatOrder = (o: any) => ({
+      orderId: o.orderId || o.orderReference,
+      restaurantId: o.restaurantId || "REST-001",
+      tableNo: Number(o.tableNo || o.tableNumber || parsedTableNo || 1),
+      status: o.status || "RECEIVED",
+      kitchenAcknowledged: !!(o.kitchenAcknowledged || o.kitchenNotified),
+      kitchenNotified: !!(o.kitchenNotified || o.kitchenAcknowledged),
+      items: o.items || [],
+      totalAmount: o.totalAmount || 0,
+      orderNote: o.orderNote || "",
+      statusHistory: o.statusHistory || [],
+      createdAt: o.createdAt || new Date().toISOString(),
+      updatedAt: o.updatedAt || new Date().toISOString(),
+    });
+
     return NextResponse.json({
       success: true,
-      order: {
-        orderId: order.orderId || order.orderReference || orderId,
-        restaurantId: order.restaurantId || "REST-001",
-        tableNo: order.tableNo || order.tableNumber || 1,
-        status: order.status || "RECEIVED",
-        kitchenAcknowledged: !!(order.kitchenAcknowledged || order.kitchenNotified),
-        kitchenNotified: !!(order.kitchenNotified || order.kitchenAcknowledged),
-        items: order.items || [],
-        totalAmount: order.totalAmount || 0,
-        orderNote: order.orderNote || "",
-        statusHistory: order.statusHistory || [],
-        createdAt: order.createdAt || new Date().toISOString(),
-        updatedAt: order.updatedAt || new Date().toISOString(),
-      },
+      order: formatOrder(primary),
+      orders: allOrdersList.map(formatOrder),
     });
   } catch (err: any) {
     console.error("Order status fetch error:", err);
     return NextResponse.json(
       { success: false, message: err?.message || "Server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const secret =
+      process.env.CUSTOMER_STATUS_WEBHOOK_SECRET || "customer-secret-key-change-in-production";
+
+    const incomingSecret =
+      req.headers.get("x-webhook-secret") ||
+      req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+
+    if (incomingSecret && incomingSecret !== secret) {
+      console.warn("[CUSTOMER] Unauthorized status callback attempt");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+
+    const extId = (body.externalOrderId || body.orderId || body.orderReference || "").trim();
+    const status = (body.status || "").trim();
+    const restaurantId = body.restaurantId || "REST-001";
+    const updatedAt = body.updatedAt || new Date().toISOString();
+
+    if (!extId || !status) {
+      return NextResponse.json(
+        { error: "Missing externalOrderId or status" },
+        { status: 422 }
+      );
+    }
+
+    console.log(`[CUSTOMER] Status callback received: ${extId} ${status}`);
+
+    await connectToDatabase();
+
+    const queryConditions: any[] = [
+      { orderId: extId },
+      { orderReference: extId },
+    ];
+    if (mongoose.Types.ObjectId.isValid(extId)) {
+      queryConditions.push({ _id: new mongoose.Types.ObjectId(extId) });
+    }
+
+    const order = await Order.findOne({ $or: queryConditions });
+
+    if (!order) {
+      console.warn(`[CUSTOMER] Order not found: ${extId}`);
+      return NextResponse.json(
+        { error: "Order not found", externalOrderId: extId },
+        { status: 404 }
+      );
+    }
+
+    console.log(`[CUSTOMER] Order found: ${extId}`);
+
+    // Update database directly
+    await Order.updateOne(
+      { _id: order._id },
+      {
+        $set: {
+          status: status,
+          kitchenAcknowledged: true,
+          kitchenNotified: true,
+          updatedAt: new Date(updatedAt),
+        },
+      }
+    );
+
+    console.log(`[CUSTOMER] Database updated: ${extId} -> ${status}`);
+
+    // Update memory cache
+    const targetRef = order.orderReference || order.orderId || extId;
+    const cachedOrder = {
+      ...(order.toObject ? order.toObject() : order),
+      status,
+      kitchenAcknowledged: true,
+      kitchenNotified: true,
+      updatedAt,
+    };
+    if (order.orderId) activeOrders.set(order.orderId, cachedOrder);
+    if (order.orderReference) activeOrders.set(order.orderReference, cachedOrder);
+
+    // Emit realtime event
+    const eventPayload = {
+      event: "ORDER_STATUS_UPDATED" as const,
+      orderId: targetRef,
+      restaurantId,
+      status: status,
+      kitchenAcknowledged: true,
+      updatedAt,
+    };
+
+    orderEventBus.emit("order_status", eventPayload);
+    if (order.orderId && order.orderId !== targetRef) {
+      orderEventBus.emit("order_status", {
+        ...eventPayload,
+        orderId: order.orderId,
+      });
+    }
+
+    console.log(`[CUSTOMER] Realtime event emitted: ${extId} -> ${status}`);
+
+    return NextResponse.json({ success: true, orderId: targetRef, status });
+  } catch (err: any) {
+    console.error("[CUSTOMER] Status callback handler error:", err);
+    return NextResponse.json(
+      { error: err?.message || "Internal server error" },
       { status: 500 }
     );
   }

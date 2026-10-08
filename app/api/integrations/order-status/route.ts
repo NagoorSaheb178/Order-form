@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Order } from "@/models/Order";
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       req.headers.get("x-webhook-secret") ||
       req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
 
-    if (incomingSecret !== secret && process.env.NODE_ENV === "production") {
+    if (incomingSecret !== secret) {
       console.warn("[CUSTOMER] Unauthorized status callback attempt");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

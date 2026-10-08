@@ -6,10 +6,15 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const targetOrderId = searchParams.get("orderId");
+  const tableNo = searchParams.get("tableNo");
 
-  if (!targetOrderId) {
-    return new Response("Missing orderId parameter", { status: 400 });
+  if (!targetOrderId && !tableNo) {
+    return new Response("Missing orderId or tableNo parameter", { status: 400 });
   }
+
+  const targetIds = targetOrderId
+    ? targetOrderId.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
 
   let isClosed = false;
   let heartbeatTimer: NodeJS.Timeout | null = null;
@@ -29,11 +34,14 @@ export async function GET(req: NextRequest) {
       };
 
       // Send initial connected confirmation
-      send({ event: "CONNECTED", orderId: targetOrderId });
+      send({ event: "CONNECTED", orderIds: targetIds, tableNo });
 
       // Listen to status updates
       statusListener = (event: OrderStatusEvent) => {
-        if (event.orderId === targetOrderId) {
+        const matchesId = targetIds.length > 0 && targetIds.includes(event.orderId);
+        const matchesTable = tableNo && (event as any).tableNo == tableNo;
+
+        if (matchesId || matchesTable || targetIds.length === 0) {
           send({
             event: "order.status_changed",
             orderId: event.orderId,

@@ -47,28 +47,91 @@ export default function OrderPage() {
   // Cart Sheet (Mobile)
   const [isCartSheetOpen, setIsCartSheetOpen] = useState<boolean>(false);
 
-  // Submission State
+  // Submission & Multi-Order State
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string>("");
   const [latestOrder, setLatestOrder] = useState<PlacedOrder | null>(null);
+  const [tableOrders, setTableOrders] = useState<PlacedOrder[]>([]);
+  const [selectedOrderId, setSelectedOrderId] = useState<string>("");
 
-  // Restore latest order from backend database on page load / refresh
+  // Currently focused order on the status screen
+  const activeOrder = useMemo(() => {
+    if (selectedOrderId) {
+      const match = tableOrders.find(
+        (o) => o.order_reference === selectedOrderId || o.orderId === selectedOrderId
+      );
+      if (match) return match;
+    }
+    return latestOrder || tableOrders[0] || null;
+  }, [selectedOrderId, tableOrders, latestOrder]);
+
+  // Restore orders for table from backend database on page load / refresh
   React.useEffect(() => {
     if (typeof window === "undefined") return;
 
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const urlOrderId = urlParams.get("orderId") || urlParams.get("ref");
+      const urlTableNo = urlParams.get("tableNo") || urlParams.get("table");
+
       const storedOrderId = localStorage.getItem("customer_latest_order_id");
-      const targetId = urlOrderId || storedOrderId;
+      const storedTableOrders = localStorage.getItem("customer_table_orders");
+      const storedTableNo = localStorage.getItem("customer_table_number");
 
-      if (!targetId) return;
+      let storedIds: string[] = [];
+      try {
+        if (storedTableOrders) {
+          const parsed = JSON.parse(storedTableOrders);
+          if (Array.isArray(parsed)) storedIds = parsed;
+        }
+      } catch (e) {}
 
-      const fetchLatestFromDb = async () => {
+      const allIds = Array.from(
+        new Set([urlOrderId, storedOrderId, ...storedIds].filter(Boolean) as string[])
+      );
+
+      const targetTable = urlTableNo || storedTableNo;
+      if (targetTable && !tableNumber) {
+        setTableNumber(Number(targetTable));
+      }
+
+      if (allIds.length === 0 && !targetTable) return;
+
+      const fetchOrdersFromDb = async () => {
         try {
-          const res = await fetch(`/api/orders/status?orderId=${targetId}`);
+          const queryParts: string[] = [];
+          if (allIds.length > 0) {
+            queryParts.push(`orderId=${encodeURIComponent(allIds.join(","))}`);
+          }
+          if (targetTable) {
+            queryParts.push(`tableNo=${encodeURIComponent(targetTable)}`);
+          }
+
+          const res = await fetch(`/api/orders/status?${queryParts.join("&")}`);
           const data = await res.json();
-          if (data.success && data.order) {
+
+          if (data.success && data.orders && data.orders.length > 0) {
+            const mappedOrders: PlacedOrder[] = data.orders.map((o: any) => ({
+              order_reference: o.orderId,
+              orderId: o.orderId,
+              restaurantId: o.restaurantId,
+              table_number: o.tableNo,
+              status: o.status,
+              kitchenAcknowledged: !!(o.kitchenAcknowledged || o.kitchenNotified),
+              items: o.items || [],
+              order_note: o.orderNote || "",
+              subtotal: o.totalAmount || 0,
+              created_at: o.createdAt,
+              updated_at: o.updatedAt,
+            }));
+
+            setTableOrders(mappedOrders);
+            const primary = mappedOrders[0];
+            setLatestOrder(primary);
+            setSelectedOrderId(primary.order_reference);
+            setTableNumber(primary.table_number);
+            setScreen("status");
+          } else if (data.success && data.order) {
             const restoredOrder: PlacedOrder = {
               order_reference: data.order.orderId,
               orderId: data.order.orderId,
@@ -82,60 +145,137 @@ export default function OrderPage() {
               created_at: data.order.createdAt,
               updated_at: data.order.updatedAt,
             };
-            setTableNumber(data.order.tableNo);
+            setTableOrders([restoredOrder]);
             setLatestOrder(restoredOrder);
+            setSelectedOrderId(restoredOrder.order_reference);
+            setTableNumber(data.order.tableNo);
             setScreen("status");
           }
         } catch (e) {
-          console.warn("[CUSTOMER] Could not restore order on mount:", e);
+          console.warn("[CUSTOMER] Could not restore orders on mount:", e);
         }
       };
 
-      fetchLatestFromDb();
+      fetchOrdersFromDb();
     } catch (e) {}
   }, []);
 
-  // Realtime order progress listener (Kitchen -> Customer)
+  // Realtime order progress listener (Kitchen -> Customer) for all table orders
   React.useEffect(() => {
-    if (!latestOrder?.order_reference) return;
+    const allKnownIds = Array.from(
+      new Set(
+        [
+          ...tableOrders.map((o) => o.order_reference || o.orderId),
+          latestOrder?.order_reference,
+          latestOrder?.orderId,
+        ].filter(Boolean) as string[]
+      )
+    );
 
-    const ref = latestOrder.order_reference;
+    if (allKnownIds.length === 0 && !tableNumber) return;
 
-    // Fetch latest real status from database/backend
+    const queryParts: string[] = [];
+    if (allKnownIds.length > 0) {
+      queryParts.push(`orderId=${encodeURIComponent(allKnownIds.join(","))}`);
+    }
+    if (tableNumber) {
+      queryParts.push(`tableNo=${encodeURIComponent(tableNumber)}`);
+    }
+    const queryString = queryParts.join("&");
+
+    // Fetch latest real statuses for all table orders
     const pollStatus = async () => {
       try {
-        const res = await fetch(`/api/orders/status?orderId=${ref}`);
+        const res = await fetch(`/api/orders/status?${queryString}`);
         const data = await res.json();
-        if (data.success && data.order) {
-          setLatestOrder((prev) =>
-            prev && (prev.order_reference === ref || prev.orderId === ref)
-              ? {
-                  ...prev,
-                  status: data.order.status,
-                  kitchenAcknowledged: !!(data.order.kitchenAcknowledged || data.order.kitchenNotified),
-                }
-              : prev
-          );
+        if (data.success && data.orders && Array.isArray(data.orders)) {
+          setTableOrders((prev) => {
+            const prevMap = new Map(prev.map((o) => [o.order_reference, o]));
+
+            for (const d of data.orders) {
+              const ref = d.orderId;
+              const existing = prevMap.get(ref);
+              if (existing) {
+                prevMap.set(ref, {
+                  ...existing,
+                  status: d.status,
+                  kitchenAcknowledged: !!(d.kitchenAcknowledged || d.kitchenNotified),
+                  updated_at: d.updatedAt,
+                });
+              } else {
+                prevMap.set(ref, {
+                  order_reference: d.orderId,
+                  orderId: d.orderId,
+                  restaurantId: d.restaurantId,
+                  table_number: d.tableNo,
+                  status: d.status,
+                  kitchenAcknowledged: !!(d.kitchenAcknowledged || d.kitchenNotified),
+                  items: d.items || [],
+                  order_note: d.orderNote || "",
+                  subtotal: d.totalAmount || 0,
+                  created_at: d.createdAt,
+                  updated_at: d.updatedAt,
+                });
+              }
+            }
+
+            return Array.from(prevMap.values()).sort((a, b) => {
+              const tA = new Date(a.created_at || 0).getTime();
+              const tB = new Date(b.created_at || 0).getTime();
+              return tB - tA;
+            });
+          });
+
+          if (data.order) {
+            setLatestOrder((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    status: data.order.status,
+                    kitchenAcknowledged: !!(data.order.kitchenAcknowledged || data.order.kitchenNotified),
+                    updated_at: data.order.updatedAt,
+                  }
+                : prev
+            );
+          }
         }
       } catch (e) {}
     };
 
     pollStatus();
-    // Continuous polling fallback every 3 seconds to guarantee updates
+    // Continuous polling fallback every 3 seconds
     const pollTimer = setInterval(pollStatus, 3000);
 
     let sse: EventSource | null = null;
     try {
-      sse = new EventSource(`/api/orders/events?orderId=${ref}`);
+      sse = new EventSource(`/api/orders/events?${queryString}`);
       sse.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
           if (
-            (payload.event === "ORDER_STATUS_UPDATED" || payload.event === "order.status_changed") &&
-            (payload.orderId === ref || payload.orderId === latestOrder.orderId)
+            payload.event === "ORDER_STATUS_UPDATED" ||
+            payload.event === "order.status_changed"
           ) {
+            const targetId = payload.orderId;
+            setTableOrders((prev) =>
+              prev.map((o) => {
+                if (o.order_reference === targetId || o.orderId === targetId) {
+                  return {
+                    ...o,
+                    status: payload.status,
+                    kitchenAcknowledged:
+                      payload.kitchenAcknowledged !== undefined
+                        ? !!payload.kitchenAcknowledged
+                        : o.kitchenAcknowledged,
+                    updated_at: payload.updatedAt,
+                  };
+                }
+                return o;
+              })
+            );
+
             setLatestOrder((prev) =>
-              prev
+              prev && (prev.order_reference === targetId || prev.orderId === targetId)
                 ? {
                     ...prev,
                     status: payload.status,
@@ -143,6 +283,7 @@ export default function OrderPage() {
                       payload.kitchenAcknowledged !== undefined
                         ? !!payload.kitchenAcknowledged
                         : prev.kitchenAcknowledged,
+                    updated_at: payload.updatedAt,
                   }
                 : prev
             );
@@ -155,7 +296,11 @@ export default function OrderPage() {
       clearInterval(pollTimer);
       if (sse) sse.close();
     };
-  }, [latestOrder?.order_reference]);
+  }, [
+    tableOrders.map((o) => o.order_reference).join(","),
+    latestOrder?.order_reference,
+    tableNumber,
+  ]);
 
   // Calculations
   const cartSubtotal = useMemo(() => {
@@ -309,15 +454,28 @@ export default function OrderPage() {
       };
 
       try {
+        const nextOrders = [
+          confirmedOrder,
+          ...tableOrders.filter((o) => o.order_reference !== confirmedOrder.order_reference),
+        ];
+        const orderIds = nextOrders.map((o) => o.order_reference);
+        localStorage.setItem("customer_table_orders", JSON.stringify(orderIds));
         localStorage.setItem("customer_latest_order_id", confirmedOrder.order_reference);
+        localStorage.setItem("customer_table_number", String(tableNumber));
         if (typeof window !== "undefined") {
           const u = new URL(window.location.href);
           u.searchParams.set("orderId", confirmedOrder.order_reference);
+          u.searchParams.set("tableNo", String(tableNumber));
           window.history.replaceState(null, "", u.toString());
         }
       } catch (e) {}
 
+      setTableOrders((prev) => [
+        confirmedOrder,
+        ...prev.filter((o) => o.order_reference !== confirmedOrder.order_reference),
+      ]);
       setLatestOrder(confirmedOrder);
+      setSelectedOrderId(confirmedOrder.order_reference);
       setCart([]);
       setOrderNote("");
       setIsSubmitting(false);
@@ -535,6 +693,39 @@ export default function OrderPage() {
               </nav>
             </div>
           </header>
+
+          {/* Active Table Orders Banner */}
+          {tableOrders.length > 0 && (
+            <div
+              id="active-table-orders-banner"
+              className="bg-[#edf0e7] border-b border-[#d8dec9] py-2.5 px-3 sm:px-4 cursor-pointer hover:bg-[#e4e8dc] transition-colors"
+              onClick={() => {
+                setScreen("status");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              role="region"
+              aria-label="Active table orders status bar"
+            >
+              <div className="shell flex items-center justify-between gap-3 text-xs sm:text-sm">
+                <div className="flex items-center gap-2 text-[#59634a] font-medium min-w-0">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#59634a] animate-pulse shrink-0" />
+                  <span className="truncate">
+                    <strong>Table {tableNumber}:</strong>{" "}
+                    {tableOrders.length === 1
+                      ? `Order ${tableOrders[0].order_reference} active in kitchen (${tableOrders[0].status})`
+                      : `${tableOrders.length} orders active in kitchen`}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="text-[#59634a] font-bold underline hover:text-[#414a35] shrink-0 text-xs sm:text-sm flex items-center gap-1"
+                >
+                  <span>Track status</span>
+                  <span>→</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="shell menu-layout">
             <div>
@@ -879,7 +1070,7 @@ export default function OrderPage() {
             </h1>
 
             <p id="confirmation-reference" className="font-semibold text-sm sm:text-base mt-3 text-[#252720]">
-              Order {latestOrder.order_reference} · Table {latestOrder.table_number}
+              Order {latestOrder.order_reference}{tableOrders.length > 1 ? ` (Round ${tableOrders.length})` : ""} · Table {latestOrder.table_number}
             </p>
 
             <div className="status-card mt-5">
@@ -976,12 +1167,15 @@ export default function OrderPage() {
       {/* ============================================================== */}
       {/* SCREEN 5: ORDER PROGRESS STATUS TRACKER                        */}
       {/* ============================================================== */}
-      {screen === "status" && latestOrder && (
+      {/* ============================================================== */}
+      {/* SCREEN 5: ORDER PROGRESS STATUS TRACKER (MULTI-ROUND TABLE)    */}
+      {/* ============================================================== */}
+      {screen === "status" && activeOrder && (
         <section id="status" className="screen active" aria-labelledby="status-title">
           <div className="shell max-w-2xl py-6 sm:py-8">
             <button
               id="status-back"
-              className="secondary mb-5 sm:mb-6"
+              className="secondary mb-4 sm:mb-5"
               type="button"
               onClick={() => {
                 setScreen("menu");
@@ -994,12 +1188,74 @@ export default function OrderPage() {
             <p className="eyebrow">Kitchen progress</p>
             <h1
               id="status-title"
-              className="brand text-2xl sm:text-3xl mt-1.5 text-[#252720] font-semibold"
+              className="brand text-2xl sm:text-3xl mt-1 text-[#252720] font-semibold"
             >
               Your order status
             </h1>
+            <p className="text-xs sm:text-sm text-[#73766c] mt-1">
+              Table {activeOrder.table_number} · Realtime kitchen synchronization
+            </p>
 
-            <div id="status-details" className="status-card mt-5">
+            {/* Multi-Order Round Switcher Tabs */}
+            {tableOrders.length > 1 && (
+              <div className="mt-5 mb-1" id="order-rounds-selector">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#73766c]">
+                    Table {activeOrder.table_number} · Order rounds ({tableOrders.length})
+                  </span>
+                  <span className="text-xs font-semibold text-[#59634a] bg-[#edf0e7] px-2 py-0.5 rounded-full">
+                    All active
+                  </span>
+                </div>
+                <div
+                  className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-none"
+                  role="tablist"
+                  aria-label="Table order rounds"
+                >
+                  {tableOrders.map((ord, idx) => {
+                    const roundNum = tableOrders.length - idx;
+                    const isSelected =
+                      ord.order_reference === activeOrder.order_reference ||
+                      ord.orderId === activeOrder.orderId;
+                    return (
+                      <button
+                        key={ord.order_reference}
+                        type="button"
+                        role="tab"
+                        aria-selected={isSelected}
+                        onClick={() => setSelectedOrderId(ord.order_reference)}
+                        className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all border flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                          isSelected
+                            ? "bg-[#59634a] text-white border-[#59634a] shadow-sm"
+                            : "bg-[#fffdf8] text-[#252720] border-[#e6e1d6] hover:border-[#59634a]"
+                        }`}
+                      >
+                        <span>Round {roundNum}</span>
+                        <span className="text-[11px] opacity-75">({ord.order_reference})</span>
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase ${
+                            isSelected
+                              ? "bg-white/20 text-white"
+                              : ord.status === "READY"
+                              ? "bg-[#e2f0e5] text-[#256333]"
+                              : ord.status === "PREPARING"
+                              ? "bg-[#f5ecda] text-[#7a5e20]"
+                              : ord.status === "SERVED"
+                              ? "bg-[#edf0e7] text-[#59634a]"
+                              : "bg-[#edf0e7] text-[#59634a]"
+                          }`}
+                        >
+                          {ord.status}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Active Round Status Card */}
+            <div id="status-details" className="status-card mt-4">
               <div className="kitchen">
                 <svg
                   fill="none"
@@ -1015,21 +1271,43 @@ export default function OrderPage() {
                 </svg>
                 <span>Kitchen system connected</span>
               </div>
-              <p className="font-semibold mt-4 text-[#252720] text-base sm:text-lg">
-                {latestOrder.order_reference}
-              </p>
-              <p className="text-xs sm:text-sm text-[#73766c] mt-0.5">
-                Table {latestOrder.table_number} · Received{" "}
-                {new Date(latestOrder.created_at).toLocaleTimeString([], {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
-              </p>
+
+              {(() => {
+                const activeIndex = tableOrders.findIndex(
+                  (o) =>
+                    o.order_reference === activeOrder.order_reference ||
+                    o.orderId === activeOrder.orderId
+                );
+                const roundNum =
+                  activeIndex !== -1 ? tableOrders.length - activeIndex : 1;
+
+                return (
+                  <div className="mt-4">
+                    <div className="flex items-center gap-2">
+                      {tableOrders.length > 1 && (
+                        <span className="text-xs font-bold uppercase tracking-wider bg-[#edf0e7] text-[#59634a] px-2 py-0.5 rounded">
+                          Round {roundNum}
+                        </span>
+                      )}
+                      <p className="font-bold text-[#252720] text-base sm:text-lg">
+                        {activeOrder.order_reference}
+                      </p>
+                    </div>
+                    <p className="text-xs sm:text-sm text-[#73766c] mt-1">
+                      Table {activeOrder.table_number} · Received{" "}
+                      {new Date(activeOrder.created_at).toLocaleTimeString([], {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                );
+              })()}
 
               {/* Dynamic Vertical Timeline with Connecting Lines */}
               {(() => {
-                const currentStatus = latestOrder.status || "RECEIVED";
-                const isKitchenNotified = !!latestOrder.kitchenAcknowledged;
+                const currentStatus = activeOrder.status || "RECEIVED";
+                const isKitchenNotified = !!activeOrder.kitchenAcknowledged;
 
                 const isRecDone = true;
                 const isNotifiedDone =
@@ -1107,15 +1385,19 @@ export default function OrderPage() {
                 );
               })()}
 
-
               <div className="mt-6 pt-4 border-t border-[#e6e1d6]">
                 <p className="font-semibold text-xs uppercase tracking-wider text-[#73766c] mb-2">
-                  Items in preparation
+                  Items in this round
                 </p>
-                {latestOrder.items.map((x, i) => (
+                {activeOrder.items.map((x, i) => (
                   <div key={i} className="text-xs sm:text-sm py-1 text-[#252720] flex justify-between">
                     <span>
                       {x.qty} × {x.name}
+                      {x.note && (
+                        <span className="text-[#73766c] block text-[11px]">
+                          “{x.note}”
+                        </span>
+                      )}
                     </span>
                     <span className="text-[#73766c]">
                       {formatMoney(x.price * x.qty)}
@@ -1123,6 +1405,158 @@ export default function OrderPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Consolidated All Table Orders Card (When Table has Multiple Rounds) */}
+            {tableOrders.length > 1 && (
+              <div id="all-table-orders-card" className="status-card mt-5">
+                <div className="flex items-center justify-between pb-3 border-b border-[#e6e1d6]">
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base text-[#252720]">
+                      All Orders for Table {activeOrder.table_number}
+                    </h3>
+                    <p className="text-xs text-[#73766c] mt-0.5">
+                      {tableOrders.length} order rounds placed · Track &amp; verify all items
+                    </p>
+                  </div>
+                  <span className="tag bg-[#edf0e7] text-[#59634a]">
+                    Active Dine-in
+                  </span>
+                </div>
+
+                <div className="divide-y divide-[#e6e1d6] mt-1">
+                  {tableOrders.map((ord, idx) => {
+                    const roundNum = tableOrders.length - idx;
+                    const isSelected =
+                      ord.order_reference === activeOrder.order_reference ||
+                      ord.orderId === activeOrder.orderId;
+
+                    return (
+                      <div
+                        key={ord.order_reference}
+                        className={`py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl transition-all ${
+                          isSelected ? "bg-[#f5f2e9] px-3 -mx-2.5" : "px-1"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-xs sm:text-sm text-[#252720]">
+                              Round {roundNum} ({ord.order_reference})
+                            </span>
+                            <span
+                              className={`tag text-[10px] ${
+                                ord.status === "READY"
+                                  ? "bg-[#e2f0e5] text-[#256333]"
+                                  : ord.status === "PREPARING"
+                                  ? "bg-[#f5ecda] text-[#7a5e20]"
+                                  : ord.status === "SERVED"
+                                  ? "bg-[#edf0e7] text-[#59634a]"
+                                  : "bg-[#edf0e7] text-[#59634a]"
+                              }`}
+                            >
+                              {ord.status}
+                            </span>
+                            <span className="text-[11px] text-[#73766c]">
+                              {new Date(ord.created_at).toLocaleTimeString([], {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#73766c] mt-1">
+                            {ord.items.map((it) => `${it.qty}× ${it.name}`).join(", ")}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between sm:justify-end gap-3 self-stretch sm:self-auto pt-1 sm:pt-0">
+                          <strong className="text-xs sm:text-sm text-[#252720]">
+                            {formatMoney(ord.subtotal)}
+                          </strong>
+                          {!isSelected ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedOrderId(ord.order_reference);
+                                window.scrollTo({ top: 0, behavior: "smooth" });
+                              }}
+                              className="text-xs font-semibold text-[#59634a] underline hover:text-[#414a35] cursor-pointer"
+                            >
+                              Check status
+                            </button>
+                          ) : (
+                            <span className="text-[11px] font-semibold text-[#59634a]">
+                              Viewing
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex justify-between font-bold pt-3.5 mt-2 border-t border-[#e6e1d6] text-sm sm:text-base text-[#252720]">
+                  <span>Total Table Bill</span>
+                  <span>
+                    {formatMoney(
+                      tableOrders.reduce((sum, o) => sum + (o.subtotal || 0), 0)
+                    )}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Quick Actions at Bottom of Status Screen */}
+            <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 mt-5 sm:mt-6">
+              <button
+                id="order-more-status-btn"
+                className="primary flex-1"
+                type="button"
+                onClick={() => {
+                  setScreen("menu");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              >
+                + Order more dishes
+              </button>
+              <button
+                id="refresh-status-btn"
+                className="secondary flex-1"
+                type="button"
+                onClick={async () => {
+                  try {
+                    const allKnownIds = Array.from(
+                      new Set(
+                        [
+                          ...tableOrders.map((o) => o.order_reference || o.orderId),
+                          activeOrder.order_reference,
+                        ].filter(Boolean) as string[]
+                      )
+                    );
+                    const q = `orderId=${encodeURIComponent(allKnownIds.join(","))}&tableNo=${activeOrder.table_number}`;
+                    const res = await fetch(`/api/orders/status?${q}`);
+                    const data = await res.json();
+                    if (data.success && data.orders && Array.isArray(data.orders)) {
+                      setTableOrders(
+                        data.orders.map((o: any) => ({
+                          order_reference: o.orderId,
+                          orderId: o.orderId,
+                          restaurantId: o.restaurantId,
+                          table_number: o.tableNo,
+                          status: o.status,
+                          kitchenAcknowledged: !!(o.kitchenAcknowledged || o.kitchenNotified),
+                          items: o.items || [],
+                          order_note: o.orderNote || "",
+                          subtotal: o.totalAmount || 0,
+                          created_at: o.createdAt,
+                          updated_at: o.updatedAt,
+                        }))
+                      );
+                    }
+                  } catch (e) {}
+                }}
+              >
+                Refresh status
+              </button>
             </div>
           </div>
         </section>
